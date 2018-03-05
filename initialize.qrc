@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="新前缀">
+    <file>gnome_clocks_128px_1174945_easyicon.net.png</file>
+  </qresource>
+</RCC>

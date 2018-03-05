@@ -1,0 +1,2931 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>DisplayGUIClass</class>
+ <widget class="QMainWindow" name="DisplayGUIClass">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1283</width>
+    <height>880</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>CASC</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QTextEdit" name="statusEdit">
+    <property name="geometry">
+     <rect>
+      <x>600</x>
+      <y>500</y>
+      <width>600</width>
+      <height>301</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(255, 255, 255);</string>
+    </property>
+   </widget>
+   <widget class="QTabWidget" name="tabWidget">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>10</y>
+      <width>571</width>
+      <height>821</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <widget class="QWidget" name="tab_3">
+     <attribute name="title">
+      <string>点云</string>
+     </attribute>
+     <widget class="QVTKWidget" name="PCLwidget_1" native="true">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>20</y>
+        <width>512</width>
+        <height>375</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgb(0, 0, 0);</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab">
+     <attribute name="title">
+      <string>左侧图片</string>
+     </attribute>
+     <widget class="QLabel" name="LeftImageFirstlabel">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>20</y>
+        <width>512</width>
+        <height>375</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgb(0, 0, 0);</string>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="LeftImageSecondlabel">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>410</y>
+        <width>512</width>
+        <height>375</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgb(0, 0, 0);</string>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="tab_2">
+     <attribute name="title">
+      <string>右侧图片</string>
+     </attribute>
+     <widget class="QLabel" name="RightImageFirstlabel">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>20</y>
+        <width>512</width>
+        <height>375</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgb(0, 0, 0);</string>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
+      </property>
+     </widget>
+     <widget class="QLabel" name="RightImageSecondlabel">
+      <property name="geometry">
+       <rect>
+        <x>20</x>
+        <y>410</y>
+        <width>512</width>
+        <height>375</height>
+       </rect>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">background-color: rgb(0, 0, 0);</string>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
+      </property>
+     </widget>
+    </widget>
+   </widget>
+   <widget class="QLineEdit" name="numEdit">
+    <property name="geometry">
+     <rect>
+      <x>1230</x>
+      <y>60</y>
+      <width>21</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>1</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_19">
+    <property name="geometry">
+     <rect>
+      <x>1230</x>
+      <y>30</y>
+      <width>54</width>
+      <height>12</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>序号：</string>
+    </property>
+   </widget>
+   <widget class="QToolBox" name="toolBox">
+    <property name="geometry">
+     <rect>
+      <x>610</x>
+      <y>30</y>
+      <width>591</width>
+      <height>441</height>
+     </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <widget class="QWidget" name="page">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>0</y>
+       <width>591</width>
+       <height>389</height>
+      </rect>
+     </property>
+     <attribute name="label">
+      <string>横置发动机</string>
+     </attribute>
+     <widget class="QTabWidget" name="tabWidget_2">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>591</width>
+        <height>311</height>
+       </rect>
+      </property>
+      <property name="currentIndex">
+       <number>1</number>
+      </property>
+      <widget class="QWidget" name="tab_4">
+       <attribute name="title">
+        <string>工步1</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_8">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>10</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_7">
+         <item>
+          <widget class="QLabel" name="label_80">
+           <property name="text">
+            <string>发动机（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_20">
+           <item>
+            <widget class="QLabel" name="label_81">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_82">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalEngine_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_83">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalEngine_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_84">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalEngine_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_9">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>120</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_8">
+         <item>
+          <widget class="QLabel" name="label_93">
+           <property name="text">
+            <string>前传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_24">
+           <item>
+            <widget class="QLabel" name="label_98">
+             <property name="text">
+              <string>第一次圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_99">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_First_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_100">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_First_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_101">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_First_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_25">
+           <item>
+            <widget class="QLabel" name="label_102">
+             <property name="text">
+              <string>第二次圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_103">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_Second_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_104">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_Second_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_105">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_Second_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_26">
+           <item>
+            <widget class="QLabel" name="label_106">
+             <property name="text">
+              <string>方向矢量：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_107">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_directionVector_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_108">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_directionVector_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_109">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_horizontalFrontDriveBox_directionVector_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="tab_5">
+       <attribute name="title">
+        <string>工步2</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_11">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_9">
+         <item>
+          <widget class="QLabel" name="label_85">
+           <property name="text">
+            <string>发动机（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_21">
+           <item>
+            <widget class="QLabel" name="label_86">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_87">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_88">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_89">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_22">
+           <item>
+            <widget class="QLabel" name="label_90">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_91">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_92">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_94">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_23">
+           <item>
+            <widget class="QLabel" name="label_95">
+             <property name="text">
+              <string>安装孔：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_96">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_holeCenter_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_97">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_holeCenter_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_110">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalEngine_holeCenter_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_12">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_10">
+         <item>
+          <widget class="QLabel" name="label_111">
+           <property name="text">
+            <string>前传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_27">
+           <item>
+            <widget class="QLabel" name="label_112">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_113">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_114">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_115">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_28">
+           <item>
+            <widget class="QLabel" name="label_116">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_117">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_118">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_119">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_29">
+           <item>
+            <widget class="QLabel" name="label_120">
+             <property name="text">
+              <string>安装孔：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_121">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_holeCenter_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_122">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_holeCenter_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_123">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_horizontalFrontDriveBox_holeCenter_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="tab_6">
+       <attribute name="title">
+        <string>工步3</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_13">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_11">
+         <item>
+          <widget class="QLabel" name="label_124">
+           <property name="text">
+            <string>综合传动箱（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_30">
+           <item>
+            <widget class="QLabel" name="label_125">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_126">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_127">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_128">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_31">
+           <item>
+            <widget class="QLabel" name="label_129">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_130">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_131">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_132">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_32">
+           <item>
+            <widget class="QLabel" name="label_133">
+             <property name="text">
+              <string>安装孔：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_134">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_holeCenter_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_135">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_holeCenter_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_136">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalSyntheticalDriveBox_holeCenter_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_14">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_12">
+         <item>
+          <widget class="QLabel" name="label_137">
+           <property name="text">
+            <string>前传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_33">
+           <item>
+            <widget class="QLabel" name="label_138">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_139">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_140">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_141">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_34">
+           <item>
+            <widget class="QLabel" name="label_142">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_143">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_144">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_145">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_35">
+           <item>
+            <widget class="QLabel" name="label_146">
+             <property name="text">
+              <string>安装孔：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_147">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_holeCenter_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_148">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_holeCenter_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_149">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_horizontalFrontDriveBox_holeCenter_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="tab_7">
+       <attribute name="title">
+        <string>工步4</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_15">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_13">
+         <item>
+          <widget class="QLabel" name="label_150">
+           <property name="text">
+            <string>综合传动箱（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_36">
+           <item>
+            <widget class="QLabel" name="label_151">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_152">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_153">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_154">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_37">
+           <item>
+            <widget class="QLabel" name="label_155">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_156">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_157">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_158">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_38">
+           <item>
+            <widget class="QLabel" name="label_159">
+             <property name="text">
+              <string>相位角：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_160">
+             <property name="text">
+              <string>θ：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalSyntheticalDriveBox_phaseAngle_Edit"/>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_3">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_2">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_16">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_14">
+         <item>
+          <widget class="QLabel" name="label_163">
+           <property name="text">
+            <string>前传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_39">
+           <item>
+            <widget class="QLabel" name="label_164">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_165">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_166">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_167">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_40">
+           <item>
+            <widget class="QLabel" name="label_168">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_169">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_170">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_171">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_41">
+           <item>
+            <widget class="QLabel" name="label_172">
+             <property name="text">
+              <string>相位角：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_173">
+             <property name="text">
+              <string>θ：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFour_horizontalFrontDriveBox_phaseAngle_Edit"/>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_6">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_5">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_4">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="tab_8">
+       <attribute name="title">
+        <string>工步5</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_17">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_15">
+         <item>
+          <widget class="QLabel" name="label_174">
+           <property name="text">
+            <string>前传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_42">
+           <item>
+            <widget class="QLabel" name="label_175">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_176">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_177">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_178">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_43">
+           <item>
+            <widget class="QLabel" name="label_179">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_180">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_181">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_182">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_44">
+           <item>
+            <widget class="QLabel" name="label_183">
+             <property name="text">
+              <string>相位角：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_184">
+             <property name="text">
+              <string>θ：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalFrontDriveBox_phaseAngle_Edit"/>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_7">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_8">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_9">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_18">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_16">
+         <item>
+          <widget class="QLabel" name="label_161">
+           <property name="text">
+            <string>发动机（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_45">
+           <item>
+            <widget class="QLabel" name="label_162">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_185">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_186">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_187">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_46">
+           <item>
+            <widget class="QLabel" name="label_188">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_189">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_190">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_191">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_47">
+           <item>
+            <widget class="QLabel" name="label_192">
+             <property name="text">
+              <string>相位角：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_193">
+             <property name="text">
+              <string>θ：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepFive_horizontalEngine_phaseAngle_Edit"/>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_10">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_11">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_12">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="page_2">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>0</y>
+       <width>591</width>
+       <height>389</height>
+      </rect>
+     </property>
+     <attribute name="label">
+      <string>纵置发动机</string>
+     </attribute>
+     <widget class="QTabWidget" name="tabWidget_3">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>591</width>
+        <height>311</height>
+       </rect>
+      </property>
+      <property name="currentIndex">
+       <number>2</number>
+      </property>
+      <widget class="QWidget" name="tab_9">
+       <attribute name="title">
+        <string>工步1</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_10">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_17">
+         <item>
+          <widget class="QLabel" name="label_194">
+           <property name="text">
+            <string>综合传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_48">
+           <item>
+            <widget class="QLabel" name="label_195">
+             <property name="text">
+              <string>第一次圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_196">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_First_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_197">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_First_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_198">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_First_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_49">
+           <item>
+            <widget class="QLabel" name="label_199">
+             <property name="text">
+              <string>第二次圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_200">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_Second_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_201">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_Second_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_202">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_Second_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_50">
+           <item>
+            <widget class="QLabel" name="label_203">
+             <property name="text">
+              <string>方向矢量：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_204">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_directionVector_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_205">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_directionVector_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_206">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalSyntheticalDriveBox_directionVector_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_19">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_18">
+         <item>
+          <widget class="QLabel" name="label_207">
+           <property name="text">
+            <string>发动机（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_51">
+           <item>
+            <widget class="QLabel" name="label_208">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_209">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalEngine_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_210">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalEngine_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_211">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepOne_verticalEngine_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="tab_10">
+       <attribute name="title">
+        <string>工步2</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_20">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_19">
+         <item>
+          <widget class="QLabel" name="label_212">
+           <property name="text">
+            <string>发动机（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_52">
+           <item>
+            <widget class="QLabel" name="label_213">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_214">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_215">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_216">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_53">
+           <item>
+            <widget class="QLabel" name="label_217">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_218">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_219">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_220">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_54">
+           <item>
+            <widget class="QLabel" name="label_221">
+             <property name="text">
+              <string>安装孔：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_222">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_holeCenter_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_223">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_holeCenter_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_224">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalEngine_holeCenter_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_21">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_20">
+         <item>
+          <widget class="QLabel" name="label_225">
+           <property name="text">
+            <string>综合传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_55">
+           <item>
+            <widget class="QLabel" name="label_226">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_227">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_228">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_229">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_56">
+           <item>
+            <widget class="QLabel" name="label_230">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_231">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_232">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_233">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_57">
+           <item>
+            <widget class="QLabel" name="label_234">
+             <property name="text">
+              <string>安装孔：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_235">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_holeCenter_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_236">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_holeCenter_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_237">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepTwo_verticalSyntheticalDriveBox_holeCenter_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="tab_11">
+       <attribute name="title">
+        <string>工步3</string>
+       </attribute>
+       <widget class="QWidget" name="layoutWidget_23">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>20</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_24">
+         <item>
+          <widget class="QLabel" name="label_275">
+           <property name="text">
+            <string>发动机（左侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_67">
+           <item>
+            <widget class="QLabel" name="label_276">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_277">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_278">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_279">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_68">
+           <item>
+            <widget class="QLabel" name="label_280">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_281">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_282">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_283">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_69">
+           <item>
+            <widget class="QLabel" name="label_284">
+             <property name="text">
+              <string>相位角：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_285">
+             <property name="text">
+              <string>θ：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalEngine_phaseAngle_Edit"/>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_16">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_17">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_18">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+       <widget class="QWidget" name="layoutWidget_22">
+        <property name="geometry">
+         <rect>
+          <x>20</x>
+          <y>130</y>
+          <width>529</width>
+          <height>98</height>
+         </rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_23">
+         <item>
+          <widget class="QLabel" name="label_264">
+           <property name="text">
+            <string>综合传动箱（右侧）：</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_64">
+           <item>
+            <widget class="QLabel" name="label_265">
+             <property name="text">
+              <string>法矢：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_266">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_normal_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_267">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_normal_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_268">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_normal_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_65">
+           <item>
+            <widget class="QLabel" name="label_269">
+             <property name="text">
+              <string>圆心：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_270">
+             <property name="text">
+              <string>X：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_center_x_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_271">
+             <property name="text">
+              <string>Y：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_center_y_Edit"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_272">
+             <property name="text">
+              <string>Z：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_center_z_Edit"/>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_66">
+           <item>
+            <widget class="QLabel" name="label_273">
+             <property name="text">
+              <string>相位角：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_274">
+             <property name="text">
+              <string>θ：</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="StepThree_verticalSyntheticalDriveBox_phaseAngle_Edit"/>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_13">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_14">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <spacer name="horizontalSpacer_15">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>40</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </widget>
+     </widget>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="layoutWidget_4">
+    <property name="geometry">
+     <rect>
+      <x>1290</x>
+      <y>200</y>
+      <width>529</width>
+      <height>98</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout_3">
+     <item>
+      <widget class="QLabel" name="label_20">
+       <property name="text">
+        <string>左侧：</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_6">
+       <item>
+        <widget class="QLabel" name="label_21">
+         <property name="text">
+          <string>法矢：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_22">
+         <property name="text">
+          <string>X：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_normal_x_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_23">
+         <property name="text">
+          <string>Y：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_normal_y_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_32">
+         <property name="text">
+          <string>Z：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_normal_z_Edit"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_7">
+       <item>
+        <widget class="QLabel" name="label_33">
+         <property name="text">
+          <string>圆心：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_34">
+         <property name="text">
+          <string>X：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_center_x_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_35">
+         <property name="text">
+          <string>Y：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_center_y_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_36">
+         <property name="text">
+          <string>Z：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_center_z_Edit"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_10">
+       <item>
+        <widget class="QLabel" name="label_37">
+         <property name="text">
+          <string>安装孔：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_38">
+         <property name="text">
+          <string>X：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_holeCenter_x_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_39">
+         <property name="text">
+          <string>Y：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_holeCenter_y_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_40">
+         <property name="text">
+          <string>Z：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G1_holeCenter_z_Edit"/>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QWidget" name="layoutWidget_5">
+    <property name="geometry">
+     <rect>
+      <x>1290</x>
+      <y>310</y>
+      <width>529</width>
+      <height>98</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="verticalLayout_4">
+     <item>
+      <widget class="QLabel" name="label_41">
+       <property name="text">
+        <string>右侧：</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_11">
+       <item>
+        <widget class="QLabel" name="label_42">
+         <property name="text">
+          <string>法矢：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_43">
+         <property name="text">
+          <string>X：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_normal_x_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_44">
+         <property name="text">
+          <string>Y：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_normal_y_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_45">
+         <property name="text">
+          <string>Z：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_normal_z_Edit"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_12">
+       <item>
+        <widget class="QLabel" name="label_46">
+         <property name="text">
+          <string>圆心：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_47">
+         <property name="text">
+          <string>X：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_center_x_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_48">
+         <property name="text">
+          <string>Y：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_center_y_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_49">
+         <property name="text">
+          <string>Z：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_center_z_Edit"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_13">
+       <item>
+        <widget class="QLabel" name="label_50">
+         <property name="text">
+          <string>安装孔：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_51">
+         <property name="text">
+          <string>X：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_holeCenter_x_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_52">
+         <property name="text">
+          <string>Y：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_holeCenter_y_Edit"/>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_53">
+         <property name="text">
+          <string>Z：</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="G2_holeCenter_z_Edit"/>
+       </item>
+      </layout>
+     </item>
+    </layout>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1283</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu">
+    <property name="title">
+     <string>设置</string>
+    </property>
+    <addaction name="networkAction"/>
+    <addaction name="motionAction"/>
+    <addaction name="cameraAction"/>
+    <addaction name="eyeHandAction"/>
+    <addaction name="visualProcessingAction"/>
+   </widget>
+   <widget class="QMenu" name="menu_2">
+    <property name="title">
+     <string>显示</string>
+    </property>
+    <addaction name="displayDataAction"/>
+   </widget>
+   <addaction name="menu"/>
+   <addaction name="menu_2"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="networkAction">
+   <property name="text">
+    <string>网口通讯</string>
+   </property>
+  </action>
+  <action name="motionAction">
+   <property name="text">
+    <string>运动控制</string>
+   </property>
+  </action>
+  <action name="cameraAction">
+   <property name="text">
+    <string>相机采集</string>
+   </property>
+  </action>
+  <action name="eyeHandAction">
+   <property name="text">
+    <string>手眼标定</string>
+   </property>
+  </action>
+  <action name="visualProcessingAction">
+   <property name="text">
+    <string>视觉处理参数</string>
+   </property>
+  </action>
+  <action name="displayDataAction">
+   <property name="text">
+    <string>显示数据</string>
+   </property>
+  </action>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QVTKWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">qvtkwidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>networkAction</sender>
+   <signal>triggered()</signal>
+   <receiver>DisplayGUIClass</receiver>
+   <slot>networkActionSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>917</x>
+     <y>437</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>motionAction</sender>
+   <signal>triggered()</signal>
+   <receiver>DisplayGUIClass</receiver>
+   <slot>motionActionSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>11</x>
+     <y>180</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>cameraAction</sender>
+   <signal>triggered()</signal>
+   <receiver>DisplayGUIClass</receiver>
+   <slot>cameraActionSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>917</x>
+     <y>437</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>eyeHandAction</sender>
+   <signal>triggered()</signal>
+   <receiver>DisplayGUIClass</receiver>
+   <slot>eyeHandActionSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>917</x>
+     <y>437</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>visualProcessingAction</sender>
+   <signal>triggered()</signal>
+   <receiver>DisplayGUIClass</receiver>
+   <slot>visualProcessingActionSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>917</x>
+     <y>437</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>networkActionSlot()</slot>
+  <slot>motionActionSlot()</slot>
+  <slot>cameraActionSlot()</slot>
+  <slot>eyeHandActionSlot()</slot>
+  <slot>visualProcessingActionSlot()</slot>
+ </slots>
+</ui>
