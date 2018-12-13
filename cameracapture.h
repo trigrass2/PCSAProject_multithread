@@ -1,7 +1,6 @@
 #ifndef CAMERACAPTURE_H
 #define CAMERACAPTURE_H
 
-#include "motioncontrol.h"
 #include <QWidget>
 #include "ui_cameracapture.h"
 #include"halconcpp.h"
@@ -41,7 +40,6 @@ public slots:
 
 private:
 	Ui::CameraCapture ui;
-	MotionControl *motion;
 
 signals:
 	void sendInfo(QString,int);

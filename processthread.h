@@ -1,5 +1,8 @@
 #pragma once
 
+//运动控制头文件
+#include "motioncontrol.h"
+
 #include <QThread>
 #include <QMutex> 
 #include <iostream>
@@ -9,20 +12,24 @@
 //添加OpenCV
 #include "cv.h"
 #include "opencv.hpp"
-//添加核心算法
-#include "corealgorithm.h"
+
 #include<QFile>
 #include <QTimer>
 #include <QDateTime>
 #include <QTextStream>
 #include<QMessageBox>
 
-//
+//全局变量
 #include "define.h"
 //视觉处理类头文件
 #include "visualprocessing.h"
-//核心算法类头文件
+//添加核心算法
 #include "corealgorithm.h"
+//相机采集
+#include "cameracapture.h"
+//串口类
+#include "serialcommunication.h"
+
 using  std::cout;
 using  std::endl;
 using namespace cv;
@@ -36,36 +43,21 @@ class ProcessThread : public QThread
 	Q_OBJECT
 
 public:
-	ProcessThread(QObject *parent);
+	ProcessThread();
 	~ProcessThread();
-
+	void initialization();
 	void run();
 
 	bool threadStatus;
-	int stepNum;
-
+	//int stepNum;
+	stepName stepNum;
 	//左侧头运行
-	void LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult);
+	void LeftScannerRun(stepName stepNum, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult);
 	//右测头运行
-	void RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult);
-	//工步1第一部分
-	void stepOneFirst();
-
-
+	void RightScannerRun(stepName stepNum, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult);
+	//工步
+	void step();
 	
-	//工步一第一部分左侧处理
-	void stepOneFirstLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
-	//工步一第一部分右侧处理
-	void stepOneSecondRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
-
-
-
-
-
-
-
-
-
 	/**
 	*在实际测量中，由现场情况确定发动机、前传动箱以及综合传动箱在左，在右；
 	*/
@@ -109,9 +101,66 @@ public:
 	double CameraScanDistance;//测头扫描时运动距离
 	double CameraFirstNoScanDistance;//测头运动到第一测量位置的运动距离
 	double CameraSecondNoScanDistance;//测头运动到第二测量位置的运动距离
-
+	//光栅尺反馈导轨移动距离
+	vector<double> leftRunDis;
+	vector<double> rightRunDis;
 	//调试使用，获取图片序号
 	int imageNum;
+
+	HObject inputImageFirst;
+	HObject inputImageSecond;
+public:
+	//返回每个工步采集方位信息
+	/*stepCapture *getStepCapture(stepName name);*/
+
+	//从深度图中获取平面
+	HObject getPlaneImage(HObject &inputImage, bool& status);
+
+	//H101 检测发动机止口法矢
+	void stepOneFirstLeftProcessing(int num, HObject &inputImageFirst, HObject &inputImageSecond);
+	//H102 检测前传动箱止口面圆心1
+	void stepOneSecondRightProcessing(int num, HObject &inputImageFirst, HObject &inputImageSecond);
+	//H103 检测前传动箱止口面圆心2，圆心1，2相减1
+
+	//H201 检测发动机止口平面法矢和圆心坐标
+	void stepTwoLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H202 检测前传动箱止口平面法矢和圆心坐标
+	void stepTwoRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H203 检测发动机止口一个法兰孔圆心坐标
+	void stepTwoLeftFlangeHoleProcessing(int num, HObject inputImage);
+	//H204 检测前传动箱止口一个法兰孔圆心坐标
+	void stepTwoRightFlangeHoleProcessing(int num, HObject inputImage);
+	//H301 检测综合传送箱止口平面法矢和圆心坐标
+	void stepThreeLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H302 检测前传动箱止口平面法矢和圆心坐标
+	void stepThreeRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H303 检测综合传送箱止口一个法兰孔圆心坐标
+	void stepThreeLeftFlangeHoleProcessing(int num, HObject inputImage);
+	//H304 检测前传动箱止口一个法兰孔圆心坐标
+	void stepThreeRightFlangeHoleProcessing(int num, HObject inputImage);
+	//H401 检测综传动箱花键孔的平面法矢和圆心 
+	void stepFourLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H402 检测前传动箱花键轴的平面法矢和圆心 
+	void stepFourRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H403 检测综传动箱花键相位角
+
+	//H404 检测前传动箱花键相位角
+
+	//H501 检测发动机花键孔的平面法矢和圆心
+	void stepFiveLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H502 检测前传动箱花键轴的平面法矢和圆心
+	void stepFiveRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	//H503 检测发动机花键相位角
+
+	//H504 检测前传动箱花键相位角
+
+
+
+	//纵置
+	void v_stepThreeFirstLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	void v_stepThreeFirstRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	void v_stepThreeSecondLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
+	void v_stepThreeSecondRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond);
 signals:
 	//发送状态更新
 	void sendStatusUpdate(QString str,int num);
@@ -130,8 +179,11 @@ signals:
 
 	//调试使用，获取图片序号
 	void sendImageNum();
-
-
+	void sendLeftGratingData(vector<double> leftRunDis);
+	//发送右侧采集时，导轨实际运动量
+	void sendRightGratingData(vector<double> rightRunDis);
+	//结束线程
+	void endThread();
 public slots:
 	//接收VisualProcessing UI的参数
 	void receiveStepParam(double CamNoScanSpeed, double CamScanDistance, double CamFirstNoScanDistance, double CamSecondNoScanDistance);
@@ -146,9 +198,16 @@ public slots:
 
 	//调试使用，获取图片序号
 	void receiveImageNum(int num);
+
+	//打开运动控制
+	void motionActionSlot();
+	//打开相机设置
+	void cameraActionSlot();
 private:
 	VisualProcessing *vp;
 	CoreAlgorithm *alg;
 	QMutex mutex;
-	
+	MotionControl *motion;
+	CameraCapture *cap;
+	SerialCommunication *serial;
 };

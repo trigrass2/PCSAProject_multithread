@@ -7,14 +7,12 @@ CameraCapture::CameraCapture()
 	ui.setupUi(this);
 	cameraStatus = false;
 
-	motion = new MotionControl;
 	
 }
 
 CameraCapture::~CameraCapture()
 {
-	delete motion;
-	motion = nullptr;
+	
 }
 
 HObject CameraCapture::captureImage()

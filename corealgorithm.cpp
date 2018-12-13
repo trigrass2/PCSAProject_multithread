@@ -952,6 +952,58 @@ Vector<Point3f> CoreAlgorithm::RightToLeft(Vector<Point3f> points)
 	return points_teg;
 }
 
+//CoreAlgorithm::StereoCircle CoreAlgorithm::RightToLeft(StereoCircle centerResult)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	CoreAlgorithm::StereoCircle center_teg;
+//	double rtol[4][4];
+//	for (int i = 0; i < 4; i++){
+//		for (int j = 0; j < 4; j++){
+//			rtol[i][j] = lineEdit[40 + 4 * i + j]->text().toDouble();
+//		}
+//	}
+//	Mat RtoL(4, 4, CV_64F, rtol);
+//
+//
+//	ori.at<double>(0, 0) = centerResult.center.x;
+//	ori.at<double>(1, 0) = centerResult.center.y;
+//	ori.at<double>(2, 0) = centerResult.center.z;
+//	ori.at<double>(3, 0) = 1;
+//	teg = RtoL*ori;
+//	center_teg.center.x = teg.at<double>(0, 0);
+//	center_teg.center.y = teg.at<double>(1, 0);
+//	center_teg.center.z = teg.at<double>(2, 0);
+//	return center_teg;
+//}
+//
+//CoreAlgorithm::PlaneNormal CoreAlgorithm::RightToLeft(PlaneNormal planeparam)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	CoreAlgorithm::PlaneNormal normal_teg;
+//	double rtol[4][4];
+//	for (int i = 0; i < 4; i++){
+//		for (int j = 0; j < 4; j++){
+//			rtol[i][j] = lineEdit[40 + 4 * i + j]->text().toDouble();
+//		}
+//	}
+//	rtol[0][3] = 0;
+//	rtol[1][3] = 0;
+//	rtol[2][3] = 0;
+//	Mat RtoL(4, 4, CV_64F, rtol);
+//
+//	ori.at<double>(0, 0) = planeparam.A;
+//	ori.at<double>(1, 0) = planeparam.B;
+//	ori.at<double>(2, 0) = planeparam.C;
+//	ori.at<double>(3, 0) = 1;
+//	teg = RtoL*ori;
+//	normal_teg.A = teg.at<double>(0, 0);
+//	normal_teg.B = teg.at<double>(1, 0);
+//	normal_teg.C = teg.at<double>(2, 0);
+//	return normal_teg;
+//}
+
 double CoreAlgorithm::CalculateBorderPointsToCenterAverageDistance(Vector<Point3f> points, StereoCircle centerPoint)
 {
 	Vector<double> distances;
@@ -1064,7 +1116,7 @@ Vector<Point3f> CoreAlgorithm::depthMapCalibration(HObject &inputImage, bool sta
 	// stop(); only in hdevelop
 	//***********************************************************************************
 	
-
+	cout << "in_2" << endl;
 	if (status==true)
 	{
 		//************************************************************************************
@@ -1441,3 +1493,178 @@ HalconCpp::HObject CoreAlgorithm::getfrontDriveBoxSplineEdgeImage(HObject &input
 	return ho_ImageReduced;
 }
 
+HalconCpp::HObject CoreAlgorithm::Mat2HObject(const cv::Mat &image)
+{
+	HObject Hobj = HObject();
+	int hgt = image.rows;
+	int wid = image.cols;
+	int i;
+	//  CV_8UC3  
+	if (image.type() == CV_8UC3)
+	{
+		vector<cv::Mat> imgchannel;
+		split(image, imgchannel);
+		cv::Mat imgB = imgchannel[0];
+		cv::Mat imgG = imgchannel[1];
+		cv::Mat imgR = imgchannel[2];
+		uchar* dataR = new uchar[hgt*wid];
+		uchar* dataG = new uchar[hgt*wid];
+		uchar* dataB = new uchar[hgt*wid];
+		for (i = 0; i < hgt; i++)
+		{
+			memcpy(dataR + wid*i, imgR.data + imgR.step*i, wid);
+			memcpy(dataG + wid*i, imgG.data + imgG.step*i, wid);
+			memcpy(dataB + wid*i, imgB.data + imgB.step*i, wid);
+		}
+		GenImage3(&Hobj, "byte", wid, hgt, (Hlong)dataR, (Hlong)dataG, (Hlong)dataB);
+		delete[]dataR;
+		delete[]dataG;
+		delete[]dataB;
+		dataR = NULL;
+		dataG = NULL;
+		dataB = NULL;
+	}
+	//  CV_8UCU1  
+	else if (image.type() == CV_8UC1)
+	{
+		uchar* data = new uchar[hgt*wid];
+		for (i = 0; i < hgt; i++)
+			memcpy(data + wid*i, image.data + image.step*i, wid);
+		GenImage1(&Hobj, "byte", wid, hgt, (Hlong)data);
+		delete[] data;
+		data = NULL;
+	}
+	return Hobj;
+}
+
+//Vector<Point3f> CoreAlgorithm::MeasureToRobotTool(Vector<Point3f> points)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	Vector<Point3f> points_teg;
+//	double rtol[4][4];
+//	for (int i = 0; i < 4; i++){
+//		for (int j = 0; j < 4; j++){
+//			rtol[i][j] = lineEdit[56 + 4 * i + j]->text().toDouble();
+//		}
+//	}
+//	Mat RtoL(4, 4, CV_64F, rtol);
+//
+//	for (int i = 0; i < points.size(); i++){
+//		ori.at<double>(0, 0) = points[i].x;
+//		ori.at<double>(1, 0) = points[i].y;
+//		ori.at<double>(2, 0) = points[i].z;
+//		ori.at<double>(3, 0) = 1;
+//		teg = RtoL*ori;
+//		points_teg.push_back(Point3f(teg.at<double>(0, 0), teg.at<double>(1, 0), teg.at<double>(2, 0)));
+//
+//	}
+//}
+//
+//CoreAlgorithm::StereoCircle CoreAlgorithm::MeasureToRobotTool(StereoCircle centerResult)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	CoreAlgorithm::StereoCircle center_teg;
+//	double rtol[4][4];
+//	for (int i = 0; i < 4; i++){
+//		for (int j = 0; j < 4; j++){
+//			rtol[i][j] = lineEdit[56 + 4 * i + j]->text().toDouble();
+//		}
+//	}
+//	Mat RtoL(4, 4, CV_64F, rtol);
+//
+//
+//	ori.at<double>(0, 0) = centerResult.center.x;
+//	ori.at<double>(1, 0) = centerResult.center.y;
+//	ori.at<double>(2, 0) = centerResult.center.z;
+//	ori.at<double>(3, 0) = 1;
+//	teg = RtoL*ori;
+//	center_teg.center.x = teg.at<double>(0, 0);
+//	center_teg.center.y = teg.at<double>(1, 0);
+//	center_teg.center.z = teg.at<double>(2, 0);
+//	return center_teg;
+//}
+//
+//CoreAlgorithm::PlaneNormal CoreAlgorithm::MeasureToRobotTool(PlaneNormal planeparam)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	CoreAlgorithm::PlaneNormal normal_teg;
+//	double rtol[4][4];
+//	for (int i = 0; i < 4; i++){
+//		for (int j = 0; j < 4; j++){
+//			rtol[i][j] = lineEdit[56 + 4 * i + j]->text().toDouble();
+//		}
+//	}
+//	rtol[0][3] = 0;
+//	rtol[1][3] = 0;
+//	rtol[2][3] = 0;
+//	Mat RtoL(4, 4, CV_64F, rtol);
+//
+//	ori.at<double>(0, 0) = planeparam.A;
+//	ori.at<double>(1, 0) = planeparam.B;
+//	ori.at<double>(2, 0) = planeparam.C;
+//	ori.at<double>(3, 0) = 1;
+//	teg = RtoL*ori;
+//	normal_teg.A = teg.at<double>(0, 0);
+//	normal_teg.B = teg.at<double>(1, 0);
+//	normal_teg.C = teg.at<double>(2, 0);
+//	return normal_teg;
+//}
+//
+//Vector<Point3f> CoreAlgorithm::RobotToolToBase(Vector<Point3f> points)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	Vector<Point3f> points_teg;
+//
+//	for (int i = 0; i < points.size(); i++){
+//		ori.at<double>(0, 0) = points[i].x;
+//		ori.at<double>(1, 0) = points[i].y;
+//		ori.at<double>(2, 0) = points[i].z;
+//		ori.at<double>(3, 0) = 1;
+//		teg = robotToolToBaseMatrix*ori;
+//		points_teg.push_back(Point3f(teg.at<double>(0, 0), teg.at<double>(1, 0), teg.at<double>(2, 0)));
+//
+//	}
+//
+//	return points_teg;
+//}
+//
+//CoreAlgorithm::StereoCircle CoreAlgorithm::RobotToolToBase(StereoCircle centerResult)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	CoreAlgorithm::StereoCircle center_teg;
+//
+//	ori.at<double>(0, 0) = centerResult.center.x;
+//	ori.at<double>(1, 0) = centerResult.center.y;
+//	ori.at<double>(2, 0) = centerResult.center.z;
+//	ori.at<double>(3, 0) = 1;
+//	teg = robotToolToBaseMatrix*ori;
+//	center_teg.center.x = teg.at<double>(0, 0);
+//	center_teg.center.y = teg.at<double>(1, 0);
+//	center_teg.center.z = teg.at<double>(2, 0);
+//	return center_teg;
+//}
+//
+//CoreAlgorithm::PlaneNormal CoreAlgorithm::RobotToolToBase(PlaneNormal planeparam)
+//{
+//	Mat ori(4, 1, CV_64F);
+//	Mat teg(4, 1, CV_64F);
+//	CoreAlgorithm::PlaneNormal normal_teg;
+//
+//	robotToolToBaseMatrix.at<double>(0, 3) = 0;
+//	robotToolToBaseMatrix.at<double>(1, 3) = 0;
+//	robotToolToBaseMatrix.at<double>(2, 3) = 0;
+//	ori.at<double>(0, 0) = planeparam.A;
+//	ori.at<double>(1, 0) = planeparam.B;
+//	ori.at<double>(2, 0) = planeparam.C;
+//	ori.at<double>(3, 0) = 1;
+//	teg = robotToolToBaseMatrix*ori;
+//	normal_teg.A = teg.at<double>(0, 0);
+//	normal_teg.B = teg.at<double>(1, 0);
+//	normal_teg.C = teg.at<double>(2, 0);
+//	return normal_teg;
+//}

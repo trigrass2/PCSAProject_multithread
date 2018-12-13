@@ -613,7 +613,7 @@ void VisualProcessing::receiveStepNum(int num)
 				CameraSecondNoScanDistance = ui.RightRunSecond_StepOne->text().toDouble();
 				break;
 	}
-	case 104:
+	case 103:
 	{
 				CameraNoScanSpeed = ui.RightCameraNoScanSpeed_StepOne->text().toDouble();
 				CameraScanDistance = ui.RightCameraScan_StepOne->text().toDouble();

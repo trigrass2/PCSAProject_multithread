@@ -1,6 +1,6 @@
-#define SETUP
-//#define READIMAGE
-//#define PROGRESS
+//#define SETUP
+#define READIMAGE
+#define PROGRESS
 #include "displaygui.h"
 using  std::cout;
 using  std::endl;
@@ -17,18 +17,13 @@ DisplayGUI::DisplayGUI(QWidget *parent)
 	ui.PCLwidget_1->update();
 	//初始化核心算法
 	alg = new CoreAlgorithm(0);
-	//初始化运动控制
-	motion = new MotionControl();
-	//初始化相机采集
-	cap = new CameraCapture();
-	//初始化串口通讯
-	serial = new SerialCommunication();
+	
 	//初始化网络通讯
 	socket = new NetworkCommunication;
 	//初始化视觉处理
 	vp = new VisualProcessing;
 	//初始化处理线程
-	proThread = new ProcessThread(0);
+	proThread = new ProcessThread();
 
 	//连接网口
 	connect(socket, &NetworkCommunication::stringReceived, this, &DisplayGUI::receiveSocket);
@@ -36,12 +31,12 @@ DisplayGUI::DisplayGUI(QWidget *parent)
 	connect(this, &DisplayGUI::statusUpdate, this, &DisplayGUI::updateStatusInformation);
 	connect(proThread, &ProcessThread::sendStatusUpdate, this, &DisplayGUI::updateStatusInformation);
 
-	connect(cap, &CameraCapture::sendInfo, this, &DisplayGUI::updateStatusInformation);
+	//connect(cap, &CameraCapture::sendInfo, this, &DisplayGUI::updateStatusInformation);
 	connect(socket, &NetworkCommunication::sendInfo, this, &DisplayGUI::updateStatusInformation);
-	connect(motion, &MotionControl::sendInfo, this, &DisplayGUI::updateStatusInformation);
+	//connect(motion, &MotionControl::sendInfo, this, &DisplayGUI::updateStatusInformation);
 
-	connect(cap, &CameraCapture::toPLCInfo, serial, &SerialCommunication::sendPlC);
-	connect(motion, &MotionControl::toPLCInfo, serial, &SerialCommunication::sendPlC);
+	/*connect(cap, &CameraCapture::toPLCInfo, serial, &SerialCommunication::sendPlC);
+	connect(motion, &MotionControl::toPLCInfo, serial, &SerialCommunication::sendPlC);*/
 	
 	connect(this, &DisplayGUI::sendProcessingInformation, vp, &VisualProcessing::receiveInformation);
 	connect(vp, &VisualProcessing::sendProcessingResult, this, &DisplayGUI::receiveProcessingResult);
@@ -51,8 +46,8 @@ DisplayGUI::DisplayGUI(QWidget *parent)
 	connect(vp, &VisualProcessing::sendStepParam, this, &DisplayGUI::receiveStepParam);
 	
 	connect(ui.networkAction, SIGNAL(triggered()), this, SLOT(networkActionSlot()));
-	connect(ui.motionAction, SIGNAL(triggered()), this, SLOT(motionActionSlot()));
-	connect(ui.cameraAction, SIGNAL(triggered()), this, SLOT(cameraActionSlot()));
+	connect(ui.motionAction, &QAction::triggered, proThread, &ProcessThread::motionActionSlot);
+	connect(ui.cameraAction, &QAction::triggered, proThread, &ProcessThread::cameraActionSlot);
 	connect(ui.eyeHandAction, SIGNAL(triggered()), this, SLOT(eyeHandActionSlot()));
 	connect(ui.visualProcessingAction, SIGNAL(triggered()), this, SLOT(visualProcessingActionSlot()));
 	connect(ui.displayDataAction, SIGNAL(triggered()), this, SLOT(displayDataActionSlot()));
@@ -65,6 +60,8 @@ DisplayGUI::DisplayGUI(QWidget *parent)
 	//测试使用，获取图片序号
 	connect(proThread, &ProcessThread::sendImageNum, this, &DisplayGUI::receiveImageNum);
 	connect(this, &DisplayGUI::sendImageNum, proThread, &ProcessThread::receiveImageNum);
+	//结束线程
+	connect(proThread, &ProcessThread::endThread, this, &DisplayGUI::endThread);
 	
 	//样式表
 	ui.LeftImageFirstlabel->setFrameShape(QFrame::Box);
@@ -102,17 +99,13 @@ DisplayGUI::DisplayGUI(QWidget *parent)
 
 DisplayGUI::~DisplayGUI()
 {
-	delete cap;
-	delete motion;
+	
 	delete alg;
-	delete serial;
 	delete socket;
 	delete vp;
 	delete proThread;
-	cap = nullptr;
-	motion = nullptr;
+	
 	alg = nullptr;
-	serial = nullptr;
 	socket = nullptr;
 	vp = nullptr;
 	proThread = nullptr;
@@ -133,112 +126,264 @@ void DisplayGUI::receiveSocket(QString info)
 	{
 		switch (socketNum)
 		{
-		case 101:{
+		case 101:{//检测发动机止口法矢
 					 cout << "101" << endl;
 					 ui.toolBox->setCurrentIndex(0);
 					 ui.tabWidget_2->setCurrentIndex(0);
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步1第一部分"), 0);
-					 //stepOneFirst();
+					 statusUpdate(QStringLiteral("开始工步1第一部分,检测发动机止口法矢"), 0);
 					 proThread->threadStatus = true;
-					 proThread->stepNum = 101;
+					 proThread->stepNum = stepName(socketNum);
 					 proThread->imageNum = ui.numEdit->text().toInt();
+					 HObject inputImageFirst, inputImageSecond;
+					 ReadImage(&inputImageFirst, "edge/LeftFirst1.tif");
+					 ReadImage(&inputImageSecond, "edge/LeftSecond1.tif");
+					 proThread->inputImageFirst = inputImageFirst;
+					 proThread->inputImageSecond = inputImageSecond;
 					 proThread->start();
 					 //statusUpdate(QStringLiteral("工步1第一部分结束"), 0);
 					 break;
 		}
-		case 102:{
+		case 102:{//检测前传动箱止口面圆心1
+					 cout << "103" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(0);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步1第二部分,检测前传动箱止口面圆心1"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步1第二部分结束"), 0);
+					 break;
+		}
+		case 103:{//检测前传动箱止口面圆心2，圆心1，2相减
 					 cout << "102" << endl;
 					 ui.toolBox->setCurrentIndex(0);
 					 ui.tabWidget_2->setCurrentIndex(0);
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步1第二部分"), 0);
-					 stepOneSecond();
-					 statusUpdate(QStringLiteral("工步1第二部分结束"), 0);
+					 statusUpdate(QStringLiteral("开始工步1第三部分,检测前传动箱止口面圆心2，圆心1，2相减"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步1第二部分结束"), 0);
 					 break;
 		}
-		case 201:{
-				   cout << "201" << endl;
-				   ui.toolBox->setCurrentIndex(0);
-				   ui.tabWidget_2->setCurrentIndex(1);
-				   socket->send("OK");
-				   statusUpdate(QStringLiteral("开始工步2第一部分"), 0);
-				   stepTwoFirst();
-				   statusUpdate(QStringLiteral("工步2第一部分结束"), 0);
-				   break;
+		case 201:{//检测发动机止口平面法矢和圆心坐标
+					 cout << "201" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(1);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步2第一部分,检测发动机止口平面法矢和圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步2第一部分结束"), 0);
+					 break;
 		}
-		case 202:{
-				   cout << "202" << endl;
-				   ui.toolBox->setCurrentIndex(0);
-				   ui.tabWidget_2->setCurrentIndex(1);
-				   socket->send("OK");
-				   statusUpdate(QStringLiteral("开始工步2第二部分"), 0);
-				   stepTwoSecond();
-				   statusUpdate(QStringLiteral("工步2第二部分结束"), 0);
-				   break;
+		case 202:{//检测前传动箱止口平面法矢和圆心坐标
+					 cout << "202" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(1);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步2第二部分,检测前传动箱止口平面法矢和圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步2第二部分结束"), 0);
+					 break;
 		}
-		case 301:{
+		case 203:{//检测发动机止口一个法兰孔圆心坐标
+					 cout << "203" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(1);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步2第三部分,检测发动机止口一个法兰孔圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步2第一部分结束"), 0);
+					 break;
+		}
+		case 204:{//检测前传动箱止口一个法兰孔圆心坐标
+					 cout << "204" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(1);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步2第四部分,检测前传动箱止口一个法兰孔圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步2第二部分结束"), 0);
+					 break;
+		}
+		case 301:{//检测综合传送箱止口平面法矢和圆心坐标
 					 cout << "301" << endl;
 					 ui.toolBox->setCurrentIndex(0);
 					 ui.tabWidget_2->setCurrentIndex(2);
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步3第一部分"), 0);
-					 stepThreeFirst();
-					 statusUpdate(QStringLiteral("工步3第一部分结束"), 0);
+					 statusUpdate(QStringLiteral("开始工步3第一部分,检测综合传送箱止口平面法矢和圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步3第一部分结束"), 0);
 					 break;
 		}
-		case 302:{
+		case 302:{//检测前传动箱止口平面法矢和圆心坐标
 					 cout << "302" << endl;
 					 ui.toolBox->setCurrentIndex(0);
 					 ui.tabWidget_2->setCurrentIndex(2);
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步3第二部分"), 0);
-					 stepThreeSecond();
-					 statusUpdate(QStringLiteral("工步3第二部分结束"), 0);
+					 statusUpdate(QStringLiteral("开始工步3第二部分,检测前传动箱止口平面法矢和圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步3第二部分结束"), 0);
 					 break;
 		}
-		case 401:{
-				   ui.toolBox->setCurrentIndex(0);
-				   ui.tabWidget_2->setCurrentIndex(3);
-				   cout << "4" << endl;
-				   socket->send("OK");
-				   statusUpdate(QStringLiteral("开始工步4第一部分"), 0);
-				   stepFourFirst();
-				   statusUpdate(QStringLiteral("工步4第一部分结束"), 0);
-				   
-				   break;
+		case 303:{//检测综合传送箱止口一个法兰孔圆心坐标
+					 cout << "303" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(2);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步3第三部分,检测综合传送箱止口一个法兰孔圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步3第一部分结束"), 0);
+					 break;
 		}
-		case 402:{
+		case 304:{//检测前传动箱止口一个法兰孔圆心坐标
+					 cout << "304" << endl;
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(2);
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步3第四部分,检测前传动箱止口一个法兰孔圆心坐标"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步3第二部分结束"), 0);
+					 break;
+		}
+		case 401:{//检测综传动箱花键孔的平面法矢和圆心； 
 					 ui.toolBox->setCurrentIndex(0);
 					 ui.tabWidget_2->setCurrentIndex(3);
-					 cout << "4" << endl;
+					 cout << "401" << endl;
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步4第二部分"), 0);
-					 stepFourSecond();
-					 statusUpdate(QStringLiteral("工步4第二部分结束"), 0);
-					 
+					 statusUpdate(QStringLiteral("开始工步4第一部分,检测综传动箱花键孔的平面法矢和圆心"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步4第一部分结束"), 0);
+
 					 break;
 		}
-		case 501:{
+		case 402:{//检测前传动箱花键轴的平面法矢和圆心； 
 					 ui.toolBox->setCurrentIndex(0);
-					 ui.tabWidget_2->setCurrentIndex(4);
-					 cout << "5" << endl;
+					 ui.tabWidget_2->setCurrentIndex(3);
+					 cout << "402" << endl;
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步5第一部分"), 0);
-					 stepFiveFirst();
-					 statusUpdate(QStringLiteral("工步5第一部分结束"), 0);
-					
+					 statusUpdate(QStringLiteral("开始工步4第二部分,检测前传动箱花键轴的平面法矢和圆心"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步4第二部分结束"), 0);
+
 					 break;
 		}
-		case 502:{
+		case 403:{//检测综传动箱花键相位角
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(3);
+					 cout << "403" << endl;
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步4第三部分,检测综传动箱花键相位角"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 statusUpdate(QStringLiteral("工步4第一部分结束"), 0);
+
+					 break;
+		}
+		case 404:{//检测前传动箱花键相位角
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(3);
+					 cout << "404" << endl;
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步4第四部分，检测前传动箱花键相位角"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步4第二部分结束"), 0);
+
+					 break;
+		}
+		case 501:{//检测发动机花键孔的平面法矢和圆心
 					 ui.toolBox->setCurrentIndex(0);
 					 ui.tabWidget_2->setCurrentIndex(4);
-					 cout << "5" << endl;
+					 cout << "501" << endl;
 					 socket->send("OK");
-					 statusUpdate(QStringLiteral("开始工步5第二部分"), 0);
-					 stepFiveSecond();
-					 statusUpdate(QStringLiteral("工步5第二部分结束"), 0);
-					 
+					 statusUpdate(QStringLiteral("开始工步5第一部分,检测发动机花键孔的平面法矢和圆心"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步5第一部分结束"), 0);
+
+					 break;
+		}
+		case 502:{//检测前传动箱花键轴的平面法矢和圆心
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(4);
+					 cout << "502" << endl;
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步5第二部分,检测前传动箱花键轴的平面法矢和圆心"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步5第二部分结束"), 0);
+
+					 break;
+		}
+		case 503:{//检测发动机花键相位角
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(4);
+					 cout << "503" << endl;
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步5第一部分,检测发动机花键相位角"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步5第一部分结束"), 0);
+
+					 break;
+		}
+		case 504:{//检测前传动箱花键相位角
+					 ui.toolBox->setCurrentIndex(0);
+					 ui.tabWidget_2->setCurrentIndex(4);
+					 cout << "504" << endl;
+					 socket->send("OK");
+					 statusUpdate(QStringLiteral("开始工步5第二部分，检测前传动箱花键相位角"), 0);
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
+					 //statusUpdate(QStringLiteral("工步5第二部分结束"), 0);
+
 					 break;
 		}
 		default:{
@@ -260,7 +405,10 @@ void DisplayGUI::receiveSocket(QString info)
 					 ui.tabWidget_3->setCurrentIndex(0);
 					 socket->send("OK");
 					 statusUpdate(QStringLiteral("开始工步1第一部分"), 0);
-					 VStepOneFirst();
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);;
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
 					 statusUpdate(QStringLiteral("工步1第一部分结束"), 0);
 					 break;
 		}
@@ -270,7 +418,10 @@ void DisplayGUI::receiveSocket(QString info)
 					 ui.tabWidget_3->setCurrentIndex(0);
 					 socket->send("OK");
 					 statusUpdate(QStringLiteral("开始工步1第二部分"), 0);
-					 VStepOneSecond();
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);;
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
 					 statusUpdate(QStringLiteral("工步1第二部分结束"), 0);
 					 break;
 		}
@@ -280,7 +431,10 @@ void DisplayGUI::receiveSocket(QString info)
 					 ui.tabWidget_3->setCurrentIndex(1);
 					 socket->send("OK");
 					 statusUpdate(QStringLiteral("开始工步2第一部分"), 0);
-					 VStepTwoFirst();
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
 					 statusUpdate(QStringLiteral("工步2第一部分结束"), 0);
 					 break;
 		}
@@ -290,7 +444,10 @@ void DisplayGUI::receiveSocket(QString info)
 					 ui.tabWidget_3->setCurrentIndex(1);
 					 socket->send("OK");
 					 statusUpdate(QStringLiteral("开始工步2第二部分"), 0);
-					 VStepTwoSecond();
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
 					 statusUpdate(QStringLiteral("工步2第二部分结束"), 0);
 					 break;
 		}
@@ -300,7 +457,10 @@ void DisplayGUI::receiveSocket(QString info)
 					 ui.tabWidget_3->setCurrentIndex(2);
 					 socket->send("OK");
 					 statusUpdate(QStringLiteral("开始工步3第一部分"), 0);
-					 VStepThreeFirst();
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
 					 statusUpdate(QStringLiteral("工步3第一部分结束"), 0);
 					 break;
 		}
@@ -310,7 +470,10 @@ void DisplayGUI::receiveSocket(QString info)
 					 ui.tabWidget_3->setCurrentIndex(2);
 					 socket->send("OK");
 					 statusUpdate(QStringLiteral("开始工步3第二部分"), 0);
-					 VStepThreeSecond();
+					 proThread->threadStatus = true;
+					 proThread->stepNum = stepName(socketNum);
+					 proThread->imageNum = ui.numEdit->text().toInt();
+					 proThread->start();
 					 statusUpdate(QStringLiteral("工步3第二部分结束"), 0);
 					 break;
 		}
@@ -320,16 +483,16 @@ void DisplayGUI::receiveSocket(QString info)
 					socket->send("NG");
 					break;
 		}
-	 }
+		}
 	}
 	else
 	{
-		if (socketNum==0)
+		if (socketNum == 0)
 		{
-		
-			 socket->send("OK");
-			 statusUpdate(QStringLiteral("创建文件夹成功"), 0);
-		
+
+			socket->send("OK");
+			statusUpdate(QStringLiteral("创建文件夹成功"), 0);
+
 		}
 		else
 		{
@@ -337,9 +500,9 @@ void DisplayGUI::receiveSocket(QString info)
 			statusUpdate(QStringLiteral("输入命令错误"), 1);
 			socket->send("NG");
 		}
-		
+
 	}
-	
+
 
 }
 
@@ -687,52 +850,17 @@ QImage DisplayGUI::cvMat2QImage(const cv::Mat& mat)
 	}
 }
 
-void DisplayGUI::motionActionSlot()
-{
-	motion->show();
-}
 
 void DisplayGUI::initialization()
 {
 	
 	
 	socket->on_ConnectButton_clicked();
-#ifndef SETUP
-	double startPosition;
-	double endPosition;
-	cap->initializationCamera();
-	motion->initializationMotion();
-	startPosition = motion->GetCurrentPositon();
-	//初始时采集一次
-	/**
-	*这是因为发现程序启动后的相机第一次
-	*采集结果往往不太准确
-	*/
-	//motion->leadRailMotion(50);
-	HObject IMG;
-	//获取导轨运动速度
-	double speed;
-	speed = cap->RateToSpeed(cap->hv_RateValue);
-	//启动导轨开始运动
-	//sendPLC();
-	motion->setLeadRailVelocity(speed);
-	motion->setLeadRailMotionDistance(50);
-	IMG = cap->captureImage();
-	motion->CheckRun();
-	Sleep(100);
-	endPosition = motion->GetCurrentPositon();
-	motion->reset(startPosition, endPosition);
-	motion->CheckRun();
-#endif
 	
+	proThread->initialization();
 	socket->send("readyOK");
-
 }
 
-void DisplayGUI::cameraActionSlot()
-{
-	cap->show();
-}
 
 void DisplayGUI::displayDataActionSlot()
 {
@@ -744,1084 +872,535 @@ void DisplayGUI::displayDataActionSlot()
 
 void DisplayGUI::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult)
 {
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	double startPosition;
-	double endPosition;
-	double position;
-	//***声明变量**************************************************************//
-
-	//获取工步相关参数
-	emit sendStepNum(num);
-
-	//获取导轨当前位置
-#ifndef SETUP
-	startPosition = motion->GetCurrentPositon();
-#endif //SETUP
-	
-	//声明深度图
-	HObject inputImageFirst, inputImageSecond;
-	//声明变量
-	double speed;
-	Vector<Point3f> points;
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	start = clock();
-#ifndef SETUP
-	//光删尺计数清零
-	serial->clearGratingData();
-	Sleep(100);
-	//设置导轨运动速度
-	motion->setLeadRailVelocity(CameraNoScanSpeed);
-	//运动到第一次采集位置
-	motion->setLeadRailMotionDistance(CameraFirstNoScanDistance);
-	motion->CheckRun();
-	cout << "开始采集位置：" << endl;
-	position=motion->GetCurrentPositon();
-	Sleep(500);
-	//读取光删尺反馈导轨运动距离
-	serial->readGratingData(leftRunDis);
-	Sleep(500);
-	//获取导轨运动速度
-	speed =cap-> RateToSpeed(cap->hv_RateValue);
-	//设置导轨运动速度
-	motion->setLeadRailVelocity(speed);	
-	//获取图像
-	GrabImageStart(cap->hv_AcqHandle, -1);
-	//触发相机
-	cap->sendPLC();
-	//启动导轨开始运动, 移动距离为50mm
-	motion->setLeadRailMotionDistance(CameraScanDistance);
-	GrabImageAsync(&inputImageFirst, cap->hv_AcqHandle, -1);
-#endif //SETUP
-
-#ifndef READIMAGE
-	QString ImageFileName;
-	switch (num)
-	{
-	case 101:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 201:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";;
-		break;
-	case 203:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 301:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";;
-		break;
-	case 303:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 401:
-		ImageFileName = "gear/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 501:
-		ImageFileName = "gear/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 1010:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 2010:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";;
-		break;
-	case 2030:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 3010:
-		ImageFileName = "gear/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-		break;
-	default:
-		break;
-	}
-	
-	cout << ImageFileName.toStdString() << endl << endl;
-	QByteArray ba = ImageFileName.toLatin1();
-	const char *str = ba.data();
-	cout << ImageFileName.toStdString() << endl << endl;
-	HTuple  ImageName(str);
-	ReadImage(&inputImageFirst, ImageName);
-#endif // !READIMAGE
-	//显示图片
-	displayImage(inputImageFirst, 101);
-	//保存图片
-	SaveImage(inputImageFirst,"LeftFirst");
-	
-#ifndef SETUP
-	if (num == 203 || num == 303 || num == 2030){
-		HObject  ho_EmptyRegion;
-		GenEmptyRegion(&ho_EmptyRegion);
-		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
-	}
-	else{
-		motion->CheckRun();
-		//设置导轨运动速度
-		motion->setLeadRailVelocity(CameraNoScanSpeed);
-		//运动到第二次采集位置
-		motion->setLeadRailMotionDistance(CameraSecondNoScanDistance);
-		motion->CheckRun();
-		cout << "第二次采集位置：" << endl;
-		position = motion->GetCurrentPositon();
-		Sleep(500);
-		//读取光删尺反馈导轨运动距离
-		serial->readGratingData(leftRunDis);
-		Sleep(500);
-		//启动导轨开始运动
-		motion->setLeadRailVelocity(speed);
-		//启动导轨开始运动, 移动距离为50mm
-
-		//获取图像
-		GrabImageStart(cap->hv_AcqHandle, -1);
-		cap->sendPLC();
-		motion->setLeadRailMotionDistance(CameraScanDistance);
-		GrabImageAsync(&inputImageSecond, cap->hv_AcqHandle, -1);
-	}
-	
-
-#endif //SETUP
-
-#ifndef READIMAGE
-	switch (num)
-	{
-	case 101:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 201:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 301:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 401:
-		ImageFileName = "gear/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 501:
-		ImageFileName = "gear/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 1010:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 2010:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 3010:
-		ImageFileName = "gear/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	default:
-		break;
-	}
-	if (num != 203 && num != 303 && num != 2030){
-		ba = ImageFileName.toLatin1();
-		const char *str1 = ba.data();
-		HTuple  ImageName1(str1);
-		ReadImage(&inputImageSecond, ImageName1);
-	}
-	else{
-		HObject  ho_EmptyRegion;
-		GenEmptyRegion(&ho_EmptyRegion);
-		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
-	}
-	
-#endif //READIMAGE
-	//显示图片
-	displayImage(inputImageSecond, 102);
-	//保存图片
-	SaveImage(inputImageSecond, "LeftSecond");	
-	
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	cout << "测试" << endl;
-	cout << "运动结束位置：" << endl;
-	position=motion->GetCurrentPositon();
-	Sleep(500);
-	//获取采集结束位置
-	endPosition = motion->GetCurrentPositon();
-	//导轨复位
-	motion->reset(startPosition,endPosition);
-	cout << "测试" << endl;
-	//发送数据
-	emit sendLeftGratingData(leftRunDis);
-	//数据清空，为下次储存做准备
-	leftRunDis.clear();
-#endif //SETUP
-
-#ifndef PROGRESS
-	switch (num)
-	{
-	case 101:
-		emit sendProcessingInformation(101, inputImageFirst, inputImageSecond);
-		break;
-	case 201:
-		emit sendProcessingInformation(201, inputImageFirst, inputImageSecond);
-		break;
-	case 203:
-		emit sendProcessingInformation(203, inputImageFirst, inputImageSecond);
-		break;
-	case 301:
-		emit sendProcessingInformation(301, inputImageFirst, inputImageSecond);
-		break;
-	case 303:
-		emit sendProcessingInformation(303, inputImageFirst, inputImageSecond);
-		break;
-	case 401:
-		emit sendProcessingInformation(401, inputImageFirst, inputImageSecond);
-		break;
-	case 501:
-		emit sendProcessingInformation(501, inputImageFirst, inputImageSecond);
-		break;
-	case 1010:
-		emit sendProcessingInformation(1010, inputImageFirst, inputImageSecond);
-		break;
-	case 2010:
-		emit sendProcessingInformation(2010, inputImageFirst, inputImageSecond);
-		break;
-	case 2030:
-		emit sendProcessingInformation(2030, inputImageFirst, inputImageSecond);
-		break;
-	case 3010:
-		emit sendProcessingInformation(3010, inputImageFirst, inputImageSecond);
-		break;
-	case 3030:
-		emit sendProcessingInformation(3030, inputImageFirst, inputImageSecond);
-		break;
-	default:
-		break;
-	}
-#endif //PROGRESS
-	cout << "over!" << endl;
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	//清空变量
-	points.clear();
-
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
+//	//统计程序运行时间
+//	clock_t start, finish;
+//	double totaltime;
+//	double startPosition;
+//	double endPosition;
+//	double position;
+//	//***声明变量**************************************************************//
+//
+//	//获取工步相关参数
+//	emit sendStepNum(num);
+//
+//	//获取导轨当前位置
+//#ifndef SETUP
+//	startPosition = motion->GetCurrentPositon();
+//#endif //SETUP
+//	
+//	//声明深度图
+//	HObject inputImageFirst, inputImageSecond;
+//	//声明变量
+//	double speed;
+//	Vector<Point3f> points;
+//	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+//	start = clock();
+//#ifndef SETUP
+//	//光删尺计数清零
+//	serial->clearGratingData();
+//	Sleep(100);
+//	//设置导轨运动速度
+//	motion->setLeadRailVelocity(CameraNoScanSpeed);
+//	//运动到第一次采集位置
+//	motion->setLeadRailMotionDistance(CameraFirstNoScanDistance);
+//	motion->CheckRun();
+//	cout << "开始采集位置：" << endl;
+//	position=motion->GetCurrentPositon();
+//	Sleep(500);
+//	//读取光删尺反馈导轨运动距离
+//	serial->readGratingData(leftRunDis);
+//	Sleep(500);
+//	//获取导轨运动速度
+//	speed =cap-> RateToSpeed(cap->hv_RateValue);
+//	//设置导轨运动速度
+//	motion->setLeadRailVelocity(speed);	
+//	//获取图像
+//	GrabImageStart(cap->hv_AcqHandle, -1);
+//	//触发相机
+//	cap->sendPLC();
+//	//启动导轨开始运动, 移动距离为50mm
+//	motion->setLeadRailMotionDistance(CameraScanDistance);
+//	GrabImageAsync(&inputImageFirst, cap->hv_AcqHandle, -1);
+//#endif //SETUP
+//
+//#ifndef READIMAGE
+//	QString ImageFileName;
+//	switch (num)
+//	{
+//	case 101:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 201:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";;
+//		break;
+//	case 203:
+//		ImageFileName = "edge/hole1.tif";
+//		break;
+//	case 301:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";;
+//		break;
+//	case 303:
+//		ImageFileName = "edge/hole1.tif";
+//		break;
+//	case 401:
+//		ImageFileName = "gear/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 501:
+//		ImageFileName = "gear/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 1010:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 2010:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";;
+//		break;
+//	case 2030:
+//		ImageFileName = "edge/hole1.tif";
+//		break;
+//	case 3010:
+//		ImageFileName = "gear/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//		break;
+//	default:
+//		break;
+//	}
+//	
+//	cout << ImageFileName.toStdString() << endl << endl;
+//	QByteArray ba = ImageFileName.toLatin1();
+//	const char *str = ba.data();
+//	cout << ImageFileName.toStdString() << endl << endl;
+//	HTuple  ImageName(str);
+//	ReadImage(&inputImageFirst, ImageName);
+//#endif // !READIMAGE
+//	//显示图片
+//	displayImage(inputImageFirst, 101);
+//	//保存图片
+//	SaveImage(inputImageFirst,"LeftFirst");
+//	
+//#ifndef SETUP
+//	if (num == 203 || num == 303 || num == 2030){
+//		HObject  ho_EmptyRegion;
+//		GenEmptyRegion(&ho_EmptyRegion);
+//		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
+//	}
+//	else{
+//		motion->CheckRun();
+//		//设置导轨运动速度
+//		motion->setLeadRailVelocity(CameraNoScanSpeed);
+//		//运动到第二次采集位置
+//		motion->setLeadRailMotionDistance(CameraSecondNoScanDistance);
+//		motion->CheckRun();
+//		cout << "第二次采集位置：" << endl;
+//		position = motion->GetCurrentPositon();
+//		Sleep(500);
+//		//读取光删尺反馈导轨运动距离
+//		serial->readGratingData(leftRunDis);
+//		Sleep(500);
+//		//启动导轨开始运动
+//		motion->setLeadRailVelocity(speed);
+//		//启动导轨开始运动, 移动距离为50mm
+//
+//		//获取图像
+//		GrabImageStart(cap->hv_AcqHandle, -1);
+//		cap->sendPLC();
+//		motion->setLeadRailMotionDistance(CameraScanDistance);
+//		GrabImageAsync(&inputImageSecond, cap->hv_AcqHandle, -1);
+//	}
+//	
+//
+//#endif //SETUP
+//
+//#ifndef READIMAGE
+//	switch (num)
+//	{
+//	case 101:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 201:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 301:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 401:
+//		ImageFileName = "gear/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 501:
+//		ImageFileName = "gear/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 1010:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 2010:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 3010:
+//		ImageFileName = "gear/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	default:
+//		break;
+//	}
+//	if (num != 203 && num != 303 && num != 2030){
+//		ba = ImageFileName.toLatin1();
+//		const char *str1 = ba.data();
+//		HTuple  ImageName1(str1);
+//		ReadImage(&inputImageSecond, ImageName1);
+//	}
+//	else{
+//		HObject  ho_EmptyRegion;
+//		GenEmptyRegion(&ho_EmptyRegion);
+//		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
+//	}
+//	
+//#endif //READIMAGE
+//	//显示图片
+//	displayImage(inputImageSecond, 102);
+//	//保存图片
+//	SaveImage(inputImageSecond, "LeftSecond");	
+//	
+//#ifndef SETUP
+//	motion->CheckRun();
+//	Sleep(100);
+//	cout << "测试" << endl;
+//	cout << "运动结束位置：" << endl;
+//	position=motion->GetCurrentPositon();
+//	Sleep(500);
+//	//获取采集结束位置
+//	endPosition = motion->GetCurrentPositon();
+//	//导轨复位
+//	motion->reset(startPosition,endPosition);
+//	cout << "测试" << endl;
+//	//发送数据
+//	emit sendLeftGratingData(leftRunDis);
+//	//数据清空，为下次储存做准备
+//	leftRunDis.clear();
+//#endif //SETUP
+//
+//#ifndef PROGRESS
+//	switch (num)
+//	{
+//	case 101:
+//		emit sendProcessingInformation(101, inputImageFirst, inputImageSecond);
+//		break;
+//	case 201:
+//		emit sendProcessingInformation(201, inputImageFirst, inputImageSecond);
+//		break;
+//	case 203:
+//		emit sendProcessingInformation(203, inputImageFirst, inputImageSecond);
+//		break;
+//	case 301:
+//		emit sendProcessingInformation(301, inputImageFirst, inputImageSecond);
+//		break;
+//	case 303:
+//		emit sendProcessingInformation(303, inputImageFirst, inputImageSecond);
+//		break;
+//	case 401:
+//		emit sendProcessingInformation(401, inputImageFirst, inputImageSecond);
+//		break;
+//	case 501:
+//		emit sendProcessingInformation(501, inputImageFirst, inputImageSecond);
+//		break;
+//	case 1010:
+//		emit sendProcessingInformation(1010, inputImageFirst, inputImageSecond);
+//		break;
+//	case 2010:
+//		emit sendProcessingInformation(2010, inputImageFirst, inputImageSecond);
+//		break;
+//	case 2030:
+//		emit sendProcessingInformation(2030, inputImageFirst, inputImageSecond);
+//		break;
+//	case 3010:
+//		emit sendProcessingInformation(3010, inputImageFirst, inputImageSecond);
+//		break;
+//	case 3030:
+//		emit sendProcessingInformation(3030, inputImageFirst, inputImageSecond);
+//		break;
+//	default:
+//		break;
+//	}
+//#endif //PROGRESS
+//	cout << "over!" << endl;
+//	finish = clock();
+//	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
+//	//清空变量
+//	points.clear();
+//
+//	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
 }
 
 void DisplayGUI::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult)
 {
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	double startPosition;
-	double endPosition;
-	double position;
-	//***声明变量**************************************************************//
-	//获取导轨当前位置
-#ifndef SETUP
-	startPosition = motion->GetCurrentPositon();
-#endif //SETUP
-	//获取工步相关参数
-	emit sendStepNum(num);
-	//声明深度图
-	HObject inputImageFirst, inputImageSecond;
-	//声明变量
-	double speed;
-	Vector<Point3f> points;
-	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	start = clock();
-#ifndef SETUP
-	serial->clearGratingData();
-	Sleep(100);
-	motion->setLeadRailVelocity(CameraNoScanSpeed);
-	//运动到第一次采集位置
-	motion->setLeadRailMotionDistance(CameraFirstNoScanDistance);
-	motion->CheckRun();	
-	cout << "开始采集位置：" << endl;
-	position = motion->GetCurrentPositon();
-	Sleep(500);
-	//读取光删尺反馈导轨运动距离
-	serial->readGratingData(rightRunDis);
-	Sleep(500);
-	//获取导轨运动速度
-	speed = cap->RateToSpeed(cap->hv_RateValue);
-	//设置导轨运动速度
-	motion->setLeadRailVelocity(speed);
-	//获取图像
-	GrabImageStart(cap->hv_AcqHandle, -1);
-	cap->sendPLC();
-	//启动导轨开始运动, 移动距离为50mmCameraScanDistance
-	motion->setLeadRailMotionDistance(CameraScanDistance);
-	GrabImageAsync(&inputImageFirst, cap->hv_AcqHandle, -1);
-#endif //SETUP
-
-#ifndef READIMAGE
-	QString ImageFileName;
-	switch (num)
-	{
-	case 102:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 104:
-		ImageFileName = "edge/LeftFirst2.tif";
-		break;
-	case 202:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 204:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 302:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 304:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 402:
-		ImageFileName = "gear/RightFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 502:
-		ImageFileName = "gear/RightFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 1020:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 1040:
-		ImageFileName = "edge/LeftFirst2.tif";
-		break;
-	case 2020:
-		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
-		break;
-	case 2040:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 3020:
-		ImageFileName = "gear/RightFirst" + ui.numEdit->text() + ".tif";
-		break;
-	default:
-		break;
-	}
-	cout << ImageFileName.toStdString() << endl << endl;
-	QByteArray ba = ImageFileName.toLatin1();
-	const char *str = ba.data();
-	cout << ImageFileName.toStdString() << endl << endl;
-	HTuple  ImageName(str);
-	ReadImage(&inputImageFirst, ImageName);
-#endif // !READIMAGE
-	//显示图片
-	displayImage(inputImageFirst, 201);
-	//保存图片
-	SaveImage(inputImageFirst, "RightFirst");
-
-#ifndef SETUP
-	if (num == 204 || num == 304||num == 2040 ){
-		HObject  ho_EmptyRegion;
-		GenEmptyRegion(&ho_EmptyRegion);
-		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
-	}
-	else{
-		motion->CheckRun();
-		Sleep(100);
-		//设置导轨运动速度
-		motion->setLeadRailVelocity(CameraNoScanSpeed);
-		//运动到第二次采集位置
-		motion->setLeadRailMotionDistance(CameraSecondNoScanDistance);
-		motion->CheckRun();
-		cout << "第二次采集位置：" << endl;
-		position = motion->GetCurrentPositon();
-		Sleep(500);
-		//读取光删尺反馈导轨运动距离
-		serial->readGratingData(rightRunDis);
-		Sleep(500);
-		//启动导轨开始运动
-		motion->setLeadRailVelocity(speed);
-		//启动导轨开始运动, 移动距离为50mm
-
-		//获取图像
-		GrabImageStart(cap->hv_AcqHandle, -1);
-		cap->sendPLC();
-		motion->setLeadRailMotionDistance(CameraScanDistance);
-		GrabImageAsync(&inputImageSecond, cap->hv_AcqHandle, -1);
-	}
-
-
-#endif //SETUP
-
-#ifndef READIMAGE
-	switch (num)
-	{
-	case 102:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 104:
-		ImageFileName = "edge/LeftSecond2.tif";
-		break;
-	case 202:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	/*case 204:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;*/
-	case 302:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 402:
-		ImageFileName = "gear/RightSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 502:
-		ImageFileName = "gear/RightSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 1020:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 1040:
-		ImageFileName = "edge/LeftSecond2.tif";
-		break;
-	case 2020:
-		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
-		break;
-	case 3020:
-		ImageFileName = "gear/RightSecond" + ui.numEdit->text() + ".tif";
-		break;
-	default:
-		break;
-	}
-	if (num != 204 && num != 304 && num != 2040){
-		ba = ImageFileName.toLatin1();
-		const char *str1 = ba.data();
-		HTuple  ImageName1(str1);
-		ReadImage(&inputImageSecond, ImageName1);
-	}
-	else{
-		HObject  ho_EmptyRegion;
-		GenEmptyRegion(&ho_EmptyRegion);
-		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
-	}
-
-	
-#endif //READIMAGE
-
-
-	//显示图片
-	displayImage(inputImageSecond, 202);
-	//保存图片
-	SaveImage(inputImageSecond, "RightSecond");
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	cout << "测试" << endl;
-	cout << "运动结束位置：" << endl;
-	position = motion->GetCurrentPositon();
-	Sleep(500);
-	//获取采集结束位置
-	endPosition = motion->GetCurrentPositon();
-	//导轨复位
-	motion->reset(startPosition, endPosition);
-	cout << "测试" << endl;
-	//发送数据
-	emit sendRightGratingData(rightRunDis);
-	//数据清空，为下次储存做准备
-	rightRunDis.clear();
-#endif //SETUP
-
-#ifndef PROGRESS 
-	switch (num)
-	{
-	case 102:
-		emit sendProcessingInformation(102, inputImageFirst, inputImageSecond);
-		break;
-	case 104:
-		emit sendProcessingInformation(104, inputImageFirst, inputImageSecond);
-		break;
-	case 202:
-		emit sendProcessingInformation(202, inputImageFirst, inputImageSecond);
-		break;
-	case 204:
-		emit sendProcessingInformation(204, inputImageFirst, inputImageSecond);
-		break;
-	case 302:
-		emit sendProcessingInformation(302, inputImageFirst, inputImageSecond);
-		break;
-	case 304:
-		emit sendProcessingInformation(304, inputImageFirst, inputImageSecond);
-		break;
-	case 402:
-		emit sendProcessingInformation(402, inputImageFirst, inputImageSecond);
-		break;
-	case 502:
-		emit sendProcessingInformation(502, inputImageFirst, inputImageSecond);
-		break;
-	case 1020:
-		emit sendProcessingInformation(1020, inputImageFirst, inputImageSecond);
-		break;
-	case 1040:
-		emit sendProcessingInformation(1040, inputImageFirst, inputImageSecond);
-		break;
-	case 2020:
-		emit sendProcessingInformation(2020, inputImageFirst, inputImageSecond);
-		break;
-	case 2040:
-		emit sendProcessingInformation(2040, inputImageFirst, inputImageSecond);
-		break;
-	case 3020:
-		emit sendProcessingInformation(3020, inputImageFirst, inputImageSecond);
-		break;
-	case 3040:
-		emit sendProcessingInformation(3040, inputImageFirst, inputImageSecond);
-		break;
-	default:
-		break;
-	}
-	
-#endif //PROGRESS
-	cout << "over!" << endl;
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	//清空变量
-	points.clear();
-
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-}
-
-void DisplayGUI::stepOneFirst()
-{
-	if (leftProcessingStatus == false && rightProcessingStatus == false)
-	{
-		socket->send("ERROR101");
-	}
-	else{
-		
-		QString sendInfo = QString("H101,%1,%2,%3,%4,%5,%6").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B).arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (transmissionCaseCenterResultFirst.status == true){
-			displayCloud(transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst);
-		}
-	}
-
-}
-
-void DisplayGUI::stepOneSecond()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-
-	RightScannerRun(104, transmissionCaseCircleSecond_cloudPoints, transmissionCaseCenterResultSecond);
-	Sleep(200);
-
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-
-	cout << "圆心: " << endl;
-	cout << transmissionCaseCenterResultSecond.center.x << " " << transmissionCaseCenterResultSecond.center.y << " " << transmissionCaseCenterResultSecond.center.z << endl;
-
-	//计算定义两次测量圆心的方向矢量
-	//	directionVector=
-
-#ifndef PROGRESS
-
-	
-	if (rightProcessingStatus == false)
-	{
-		socket->send("ERROR102");
-		
-	}
-	else{
-		QString sendInfo = QString("H102,%1,%2,%3,%4,%5,%6").arg(resultMessage.rightCenter.X)
-			.arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z)
-			.arg(resultMessage.directionVector.A).arg(resultMessage.directionVector.B).arg(resultMessage.directionVector.C);
-		socket->send(sendInfo);
-		//显示边缘点云及圆心
-		displayCloud(transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst,
-			transmissionCaseCircleSecond_cloudPoints, transmissionCaseCenterResultSecond);
-	}
-#endif//！PROGRESS
-	statusUpdate(QStringLiteral("工位1运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepTwoFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	//先测止口法矢和边缘圆心
-	LeftScannerRun(201, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(202, rightCircle_cloudPoints, rightCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;
-	cout << rightCenterResult.center.x << " " << rightCenterResult.center.y << " " << rightCenterResult.center.z << endl;
-	Sleep(2000);
-	//结束
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("H201,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B)
-			.arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y).arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightNormal.A).arg(resultMessage.rightNormal.B).arg(resultMessage.rightNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftCenterResult.status == true&&rightCenterResult.status==false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult);
-		}
-		if (rightCenterResult.status == true && leftCenterResult.status == false)
-		{
-			displayCloud(rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftCenterResult.status == true && rightCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-		
-	}
-	else{
-		socket->send("ERROR201");
-	}
-#endif // !PROGRESS
-	statusUpdate(QStringLiteral("工位2第一部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepTwoSecond()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	//再测法兰孔圆心
-	LeftScannerRun(203, leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(204, rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftFlangeHoleCenterResult.center.x << " " << leftFlangeHoleCenterResult.center.y << " " << leftFlangeHoleCenterResult.center.z << endl;
-	cout << rightFlangeHoleCenterResult.center.x << " " << rightFlangeHoleCenterResult.center.y << " " << rightFlangeHoleCenterResult.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("H202,%1,%2,%3,%4,%5,%6").arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y)
-			.arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftFlangeHoleCenterResult.status == true && rightFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult);
-		}
-		if (rightFlangeHoleCenterResult.status == true && leftFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-		}
-		if (leftFlangeHoleCenterResult.status == false && rightFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftFlangeHoleCenterResult.status == true && rightFlangeHoleCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult, rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-		}
-
-	}
-	else{
-		socket->send("ERROR202");
-	}
-#endif // !PROGRESS
-	statusUpdate(QStringLiteral("工位2第二部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepThreeFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	//先测止口法矢和边缘圆心
-	LeftScannerRun(301, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(302, rightCircle_cloudPoints, rightCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;
-	cout << rightCenterResult.center.x << " " << rightCenterResult.center.y << " " << rightCenterResult.center.z << endl;
-	Sleep(2000);
-	//结束
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("H301,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B)
-			.arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y).arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightNormal.A).arg(resultMessage.rightNormal.B).arg(resultMessage.rightNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftCenterResult.status == true && rightCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult);
-		}
-		if (rightCenterResult.status == true && leftCenterResult.status == false)
-		{
-			displayCloud(rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftCenterResult.status == true && rightCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-	}
-	else{
-		socket->send("ERROR301");
-	}
-#endif // !PROGRESS
-	statusUpdate(QStringLiteral("工位3第一部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepThreeSecond()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	//再测法兰孔圆心
-	LeftScannerRun(303, leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(304, rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftFlangeHoleCenterResult.center.x << " " << leftFlangeHoleCenterResult.center.y << " " << leftFlangeHoleCenterResult.center.z << endl;
-	cout << rightFlangeHoleCenterResult.center.x << " " << rightFlangeHoleCenterResult.center.y << " " << rightFlangeHoleCenterResult.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("H302,%1,%2,%3,%4,%5,%6").arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y)
-			.arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftFlangeHoleCenterResult.status == true && rightFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult);
-		}
-		if (rightFlangeHoleCenterResult.status == true && leftFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-		}
-		if (leftFlangeHoleCenterResult.status == false && rightFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftFlangeHoleCenterResult.status == true && rightFlangeHoleCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult, rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-		}
-	}
-	else{
-		socket->send("ERROR302");
-	}
-#endif // !PROGRESS
-	statusUpdate(QStringLiteral("工位3第二部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepFourFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	////定义边缘点点云
-	//pcl::PointCloud<pcl::PointXYZ>::Ptr leftCircle_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	//pcl::PointCloud<pcl::PointXYZ>::Ptr rightCircle_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	////定义空间圆心
-	//CoreAlgorithm::StereoCircle leftCenterResult;
-	//CoreAlgorithm::StereoCircle rightCenterResult;
-	start = clock();
-	Sleep(100);
-	LeftScannerRun(401,leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(402,rightCircle_cloudPoints, rightCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-	
-	cout << "圆心: " << endl;
-	cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;
-	cout << rightCenterResult.center.x << " " << rightCenterResult.center.y << " " << rightCenterResult.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("H401,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B)
-			.arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y).arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightNormal.A).arg(resultMessage.rightNormal.B).arg(resultMessage.rightNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftCenterResult.status == true && rightCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult);
-		}
-		if (rightCenterResult.status == true && leftCenterResult.status == false)
-		{
-			displayCloud(rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftCenterResult.status == true && rightCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-	}
-	else{
-		socket->send("ERROR401");
-	}
-#endif// !PROGRESS
-	statusUpdate(QStringLiteral("工位4运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepFourSecond()
-{
-
-}
-
-void DisplayGUI::stepFiveFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	////定义边缘点点云
-	//pcl::PointCloud<pcl::PointXYZ>::Ptr leftCircle_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	//pcl::PointCloud<pcl::PointXYZ>::Ptr rightCircle_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	////定义空间圆心
-	//CoreAlgorithm::StereoCircle leftCenterResult;
-	//CoreAlgorithm::StereoCircle rightCenterResult;
-	start = clock();
-	Sleep(100);
-	LeftScannerRun(501, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(502, rightCircle_cloudPoints, rightCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;
-	cout << rightCenterResult.center.x << " " << rightCenterResult.center.y << " " << rightCenterResult.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("H501,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B)
-			.arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y).arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightNormal.A).arg(resultMessage.rightNormal.B).arg(resultMessage.rightNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftCenterResult.status == true && rightCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult);
-		}
-		if (rightCenterResult.status == true && leftCenterResult.status == false)
-		{
-			displayCloud(rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftCenterResult.status == true && rightCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-	}
-	else{
-		socket->send("ERROR501");
-	}
-#endif// !PROGRESS
-	statusUpdate(QStringLiteral("工位4运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::stepFiveSecond()
-{
-
+//	//统计程序运行时间
+//	clock_t start, finish;
+//	double totaltime;
+//	double startPosition;
+//	double endPosition;
+//	double position;
+//	//***声明变量**************************************************************//
+//	//获取导轨当前位置
+//#ifndef SETUP
+//	startPosition = motion->GetCurrentPositon();
+//#endif //SETUP
+//	//获取工步相关参数
+//	emit sendStepNum(num);
+//	//声明深度图
+//	HObject inputImageFirst, inputImageSecond;
+//	//声明变量
+//	double speed;
+//	Vector<Point3f> points;
+//	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+//	start = clock();
+//#ifndef SETUP
+//	serial->clearGratingData();
+//	Sleep(100);
+//	motion->setLeadRailVelocity(CameraNoScanSpeed);
+//	//运动到第一次采集位置
+//	motion->setLeadRailMotionDistance(CameraFirstNoScanDistance);
+//	motion->CheckRun();	
+//	cout << "开始采集位置：" << endl;
+//	position = motion->GetCurrentPositon();
+//	Sleep(500);
+//	//读取光删尺反馈导轨运动距离
+//	serial->readGratingData(rightRunDis);
+//	Sleep(500);
+//	//获取导轨运动速度
+//	speed = cap->RateToSpeed(cap->hv_RateValue);
+//	//设置导轨运动速度
+//	motion->setLeadRailVelocity(speed);
+//	//获取图像
+//	GrabImageStart(cap->hv_AcqHandle, -1);
+//	cap->sendPLC();
+//	//启动导轨开始运动, 移动距离为50mmCameraScanDistance
+//	motion->setLeadRailMotionDistance(CameraScanDistance);
+//	GrabImageAsync(&inputImageFirst, cap->hv_AcqHandle, -1);
+//#endif //SETUP
+//
+//#ifndef READIMAGE
+//	QString ImageFileName;
+//	switch (num)
+//	{
+//	case 102:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 104:
+//		ImageFileName = "edge/LeftFirst2.tif";
+//		break;
+//	case 202:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 204:
+//		ImageFileName = "edge/hole1.tif";
+//		break;
+//	case 302:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 304:
+//		ImageFileName = "edge/hole1.tif";
+//		break;
+//	case 402:
+//		ImageFileName = "gear/RightFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 502:
+//		ImageFileName = "gear/RightFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 1020:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 1040:
+//		ImageFileName = "edge/LeftFirst2.tif";
+//		break;
+//	case 2020:
+//		ImageFileName = "edge/LeftFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 2040:
+//		ImageFileName = "edge/hole1.tif";
+//		break;
+//	case 3020:
+//		ImageFileName = "gear/RightFirst" + ui.numEdit->text() + ".tif";
+//		break;
+//	default:
+//		break;
+//	}
+//	cout << ImageFileName.toStdString() << endl << endl;
+//	QByteArray ba = ImageFileName.toLatin1();
+//	const char *str = ba.data();
+//	cout << ImageFileName.toStdString() << endl << endl;
+//	HTuple  ImageName(str);
+//	ReadImage(&inputImageFirst, ImageName);
+//#endif // !READIMAGE
+//	//显示图片
+//	displayImage(inputImageFirst, 201);
+//	//保存图片
+//	SaveImage(inputImageFirst, "RightFirst");
+//
+//#ifndef SETUP
+//	if (num == 204 || num == 304||num == 2040 ){
+//		HObject  ho_EmptyRegion;
+//		GenEmptyRegion(&ho_EmptyRegion);
+//		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
+//	}
+//	else{
+//		motion->CheckRun();
+//		Sleep(100);
+//		//设置导轨运动速度
+//		motion->setLeadRailVelocity(CameraNoScanSpeed);
+//		//运动到第二次采集位置
+//		motion->setLeadRailMotionDistance(CameraSecondNoScanDistance);
+//		motion->CheckRun();
+//		cout << "第二次采集位置：" << endl;
+//		position = motion->GetCurrentPositon();
+//		Sleep(500);
+//		//读取光删尺反馈导轨运动距离
+//		serial->readGratingData(rightRunDis);
+//		Sleep(500);
+//		//启动导轨开始运动
+//		motion->setLeadRailVelocity(speed);
+//		//启动导轨开始运动, 移动距离为50mm
+//
+//		//获取图像
+//		GrabImageStart(cap->hv_AcqHandle, -1);
+//		cap->sendPLC();
+//		motion->setLeadRailMotionDistance(CameraScanDistance);
+//		GrabImageAsync(&inputImageSecond, cap->hv_AcqHandle, -1);
+//	}
+//
+//
+//#endif //SETUP
+//
+//#ifndef READIMAGE
+//	switch (num)
+//	{
+//	case 102:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 104:
+//		ImageFileName = "edge/LeftSecond2.tif";
+//		break;
+//	case 202:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	/*case 204:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;*/
+//	case 302:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 402:
+//		ImageFileName = "gear/RightSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 502:
+//		ImageFileName = "gear/RightSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 1020:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 1040:
+//		ImageFileName = "edge/LeftSecond2.tif";
+//		break;
+//	case 2020:
+//		ImageFileName = "edge/LeftSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	case 3020:
+//		ImageFileName = "gear/RightSecond" + ui.numEdit->text() + ".tif";
+//		break;
+//	default:
+//		break;
+//	}
+//	if (num != 204 && num != 304 && num != 2040){
+//		ba = ImageFileName.toLatin1();
+//		const char *str1 = ba.data();
+//		HTuple  ImageName1(str1);
+//		ReadImage(&inputImageSecond, ImageName1);
+//	}
+//	else{
+//		HObject  ho_EmptyRegion;
+//		GenEmptyRegion(&ho_EmptyRegion);
+//		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
+//	}
+//
+//	
+//#endif //READIMAGE
+//
+//
+//	//显示图片
+//	displayImage(inputImageSecond, 202);
+//	//保存图片
+//	SaveImage(inputImageSecond, "RightSecond");
+//#ifndef SETUP
+//	motion->CheckRun();
+//	Sleep(100);
+//	cout << "测试" << endl;
+//	cout << "运动结束位置：" << endl;
+//	position = motion->GetCurrentPositon();
+//	Sleep(500);
+//	//获取采集结束位置
+//	endPosition = motion->GetCurrentPositon();
+//	//导轨复位
+//	motion->reset(startPosition, endPosition);
+//	cout << "测试" << endl;
+//	//发送数据
+//	emit sendRightGratingData(rightRunDis);
+//	//数据清空，为下次储存做准备
+//	rightRunDis.clear();
+//#endif //SETUP
+//
+//#ifndef PROGRESS 
+//	switch (num)
+//	{
+//	case 102:
+//		emit sendProcessingInformation(102, inputImageFirst, inputImageSecond);
+//		break;
+//	case 104:
+//		emit sendProcessingInformation(104, inputImageFirst, inputImageSecond);
+//		break;
+//	case 202:
+//		emit sendProcessingInformation(202, inputImageFirst, inputImageSecond);
+//		break;
+//	case 204:
+//		emit sendProcessingInformation(204, inputImageFirst, inputImageSecond);
+//		break;
+//	case 302:
+//		emit sendProcessingInformation(302, inputImageFirst, inputImageSecond);
+//		break;
+//	case 304:
+//		emit sendProcessingInformation(304, inputImageFirst, inputImageSecond);
+//		break;
+//	case 402:
+//		emit sendProcessingInformation(402, inputImageFirst, inputImageSecond);
+//		break;
+//	case 502:
+//		emit sendProcessingInformation(502, inputImageFirst, inputImageSecond);
+//		break;
+//	case 1020:
+//		emit sendProcessingInformation(1020, inputImageFirst, inputImageSecond);
+//		break;
+//	case 1040:
+//		emit sendProcessingInformation(1040, inputImageFirst, inputImageSecond);
+//		break;
+//	case 2020:
+//		emit sendProcessingInformation(2020, inputImageFirst, inputImageSecond);
+//		break;
+//	case 2040:
+//		emit sendProcessingInformation(2040, inputImageFirst, inputImageSecond);
+//		break;
+//	case 3020:
+//		emit sendProcessingInformation(3020, inputImageFirst, inputImageSecond);
+//		break;
+//	case 3040:
+//		emit sendProcessingInformation(3040, inputImageFirst, inputImageSecond);
+//		break;
+//	default:
+//		break;
+//	}
+//	
+//#endif //PROGRESS
+//	cout << "over!" << endl;
+//	finish = clock();
+//	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
+//	//清空变量
+//	points.clear();
+//
+//	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
 }
 
 /*void DisplayGUI::InitializationLineEdit()
@@ -2002,8 +1581,9 @@ void DisplayGUI::receiveProcessingResult(bool planeparamStatus/*平面法矢处理状态
 		else{
 		rightProcessingStatus = status;
 		}*/
+	/*清空变量*/
+	resultMessage.clear();
 
-	
 	if (num == 101){
 		if (planeparamStatus == true){
 			//输出结果
@@ -2034,7 +1614,9 @@ void DisplayGUI::receiveProcessingResult(bool planeparamStatus/*平面法矢处理状态
 			resultMessage.leftNormal.B = "NULL";
 			resultMessage.leftNormal.C = "NULL";
 		}
-		
+		QString info;
+		info = resultMessage.leftNormal.A +","+ resultMessage.leftNormal.B +","+ resultMessage.leftNormal.C;
+		socket->send(info);
 	}	
 	if (num == 102){
 		transmissionCaseCenterResultFirst = centerResult;
@@ -2052,6 +1634,8 @@ void DisplayGUI::receiveProcessingResult(bool planeparamStatus/*平面法矢处理状态
 			resultMessage.rightCenter.X = QString::number(centerResult.center.x);
 			resultMessage.rightCenter.Y = QString::number(centerResult.center.y);
 			resultMessage.rightCenter.Z = QString::number(centerResult.center.z);
+			displayCloud(transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst);
+
 		}
 		else{
 			statusUpdate(QStringLiteral("右侧圆心拟合失败，重新采集！"), 1);
@@ -2067,7 +1651,7 @@ void DisplayGUI::receiveProcessingResult(bool planeparamStatus/*平面法矢处理状态
 			resultMessage.rightCenter.Y = "NULL";
 			resultMessage.rightCenter.Z = "NULL";
 		}
-		stepOneFirst();
+		//stepOneFirst();
 	}
 	if (num == 104){
 		transmissionCaseCenterResultSecond = centerResult;
@@ -4026,363 +3610,6 @@ void DisplayGUI::createParamFirle(QString info)
 *横置发动机信号为101 102等  
 *纵置发动机信号在横置发动机信号基础上在末尾加上0，例1010 1020
 */
-void DisplayGUI::VStepOneFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	this->close();
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	LeftScannerRun(1010, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(1020, transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-	cout << "圆心: " << endl;
-	/*cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;*/
-	cout << transmissionCaseCenterResultFirst.center.x
-		<< " " << transmissionCaseCenterResultFirst.center.y
-		<< " " << transmissionCaseCenterResultFirst.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("V101,%1,%2,%3,%4,%5,%6").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B).arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (transmissionCaseCenterResultFirst.status == true){
-			displayCloud(transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst);
-		}
-	}
-	else{
-		socket->send("ERROR101");
-	}
-#endif//！PROGRESS
-	statusUpdate(QStringLiteral("工位1第一部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	this->show();
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::VStepOneSecond()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-
-	RightScannerRun(1040, transmissionCaseCircleSecond_cloudPoints, transmissionCaseCenterResultSecond);
-	Sleep(200);
-
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-
-	cout << "圆心: " << endl;
-	cout << transmissionCaseCenterResultSecond.center.x << " " << transmissionCaseCenterResultSecond.center.y << " " << transmissionCaseCenterResultSecond.center.z << endl;
-
-#ifndef PROGRESS
-
-	//显示边缘点云及圆心
-	if (rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("V102,%1,%2,%3,%4,%5,%6").arg(resultMessage.rightCenter.X)
-			.arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z)
-			.arg(resultMessage.directionVector.A).arg(resultMessage.directionVector.B).arg(resultMessage.directionVector.C);
-
-		socket->send(sendInfo);
-		if (transmissionCaseCenterResultSecond.status == true){
-			displayCloud(transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst,
-				transmissionCaseCircleSecond_cloudPoints, transmissionCaseCenterResultSecond);
-		}
-		
-	}
-	else{
-		socket->send("ERROR102");
-	}
-#endif//！PROGRESS
-	statusUpdate(QStringLiteral("工位1运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::VStepTwoFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	//先测止口法矢和边缘圆心
-	LeftScannerRun(2010, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(2020, rightCircle_cloudPoints, rightCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;
-	cout << rightCenterResult.center.x << " " << rightCenterResult.center.y << " " << rightCenterResult.center.z << endl;
-	Sleep(2000);
-	//结束
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("V201,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B)
-			.arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y).arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightNormal.A).arg(resultMessage.rightNormal.B).arg(resultMessage.rightNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftCenterResult.status == true && rightCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult);
-		}
-		if (rightCenterResult.status == true && leftCenterResult.status == false)
-		{
-			displayCloud(rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftCenterResult.status == true && rightCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-	}
-	else{
-		socket->send("ERROR201");
-	}
-#endif // !PROGRESS
-	statusUpdate(QStringLiteral("工位2第一部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::VStepTwoSecond()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	start = clock();
-	Sleep(100);
-	//再测法兰孔圆心
-	LeftScannerRun(2030, leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(2040, rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftFlangeHoleCenterResult.center.x << " " << leftFlangeHoleCenterResult.center.y << " " << leftFlangeHoleCenterResult.center.z << endl;
-	cout << rightFlangeHoleCenterResult.center.x << " " << rightFlangeHoleCenterResult.center.y << " " << rightFlangeHoleCenterResult.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("V202,%1,%2,%3,%4,%5,%6").arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y)
-			.arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftFlangeHoleCenterResult.status == true && rightFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult);
-		}
-		if (rightFlangeHoleCenterResult.status == true && leftFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-		}
-		if (leftFlangeHoleCenterResult.status == false && rightFlangeHoleCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftFlangeHoleCenterResult.status == true && rightFlangeHoleCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult,
-				leftFlangeHoleCircle_cloudPoints, leftFlangeHoleCenterResult, rightFlangeHoleCircle_cloudPoints, rightFlangeHoleCenterResult);
-		}
-
-	}
-	else{
-		socket->send("ERROR202");
-	}
-#endif // !PROGRESS
-	statusUpdate(QStringLiteral("工位2第二部分运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::VStepThreeFirst()
-{
-	QProcess *app = new QProcess;
-	QStringList strList;//参数list
-	strList << "";//所需传入的命令行参数，不需参数则置空即可
-	app->start("QtGuiApplication2.exe", strList);
-	//统计程序运行时间
-	clock_t start, finish;
-	double totaltime;
-	////定义边缘点点云
-	//pcl::PointCloud<pcl::PointXYZ>::Ptr leftCircle_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	//pcl::PointCloud<pcl::PointXYZ>::Ptr rightCircle_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
-	////定义空间圆心
-	//CoreAlgorithm::StereoCircle leftCenterResult;
-	//CoreAlgorithm::StereoCircle rightCenterResult;
-	start = clock();
-	Sleep(100);
-	LeftScannerRun(3010, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-#endif
-	statusUpdate(QStringLiteral("左侧头扫描完毕"), 0);
-	Sleep(100);
-#ifndef SETUP
-	//转台旋转180度
-	motion->platformLtoRRotate();
-#endif
-	Sleep(500);
-	RightScannerRun(3020, rightCircle_cloudPoints, rightCenterResult);
-	statusUpdate(QStringLiteral("右侧头扫描完毕"), 0);
-#ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
-#endif // !SETUP
-
-	cout << "圆心: " << endl;
-	cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;
-	cout << rightCenterResult.center.x << " " << rightCenterResult.center.y << " " << rightCenterResult.center.z << endl;
-	//显示边缘点云及圆心
-#ifndef PROGRESS
-	displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-	if (leftProcessingStatus == true || rightProcessingStatus == true)
-	{
-		QString sendInfo = QString("V301,%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12").arg(resultMessage.leftNormal.A).arg(resultMessage.leftNormal.B)
-			.arg(resultMessage.leftNormal.C)
-			.arg(resultMessage.leftCenter.X).arg(resultMessage.leftCenter.Y).arg(resultMessage.leftCenter.Z)
-			.arg(resultMessage.rightNormal.A).arg(resultMessage.rightNormal.B).arg(resultMessage.rightNormal.C)
-			.arg(resultMessage.rightCenter.X).arg(resultMessage.rightCenter.Y).arg(resultMessage.rightCenter.Z);
-		socket->send(sendInfo);
-		if (leftCenterResult.status == true && rightCenterResult.status == false)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult);
-		}
-		if (rightCenterResult.status == true && leftCenterResult.status == false)
-		{
-			displayCloud(rightCircle_cloudPoints, rightCenterResult);
-		}
-		if (leftCenterResult.status == true && rightCenterResult.status == true)
-		{
-			displayCloud(leftCircle_cloudPoints, leftCenterResult, rightCircle_cloudPoints, rightCenterResult);
-		}
-	}
-	else{
-		socket->send("ERROR401");
-	}
-#endif// !PROGRESS
-	statusUpdate(QStringLiteral("工位4运行完毕"), 0);
-	finish = clock();
-	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
-	cout << "此程序的运行时间为" << totaltime << "秒！" << endl;
-
-	app->close();
-	delete app;
-}
-
-void DisplayGUI::VStepThreeSecond()
-{
-
-}
 
 void DisplayGUI::receiveImageNum()
 {
@@ -4396,6 +3623,13 @@ void DisplayGUI::receiveImageAndSave(HObject image, int num, QString name)
 	displayImage(image, num);
 	//保存图片
 	SaveImage(image, name);
+}
+
+void DisplayGUI::endThread()
+{
+	proThread->quit();
+	proThread->wait();
+
 }
 
 

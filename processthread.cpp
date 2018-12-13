@@ -4,17 +4,23 @@
 
 #include "processthread.h"
 
-ProcessThread::ProcessThread(QObject *parent)
-	: QThread(parent)
+ProcessThread::ProcessThread()
+	: QThread()
 {
 	threadStatus = false;
 	vp = new VisualProcessing;
 	alg = new CoreAlgorithm(0);
+	motion = new MotionControl;
+	cap = new CameraCapture;
+	serial = new SerialCommunication;
 	//¹¤Î»ÐÅÏ¢
 	connect(this, &ProcessThread::sendStepNum, vp, &VisualProcessing::receiveStepNum);
 	connect(vp, &VisualProcessing::sendStepParam, this, &ProcessThread::receiveStepParam);
 	connect(this, &ProcessThread::sendProcessingInformation, vp, &VisualProcessing::receiveInformation);
 	connect(vp, &VisualProcessing::sendProcessingResult, this, &ProcessThread::receiveProcessingResult);
+
+	connect(cap, &CameraCapture::toPLCInfo, serial, &SerialCommunication::sendPlC);
+	connect(motion, &MotionControl::toPLCInfo, serial, &SerialCommunication::sendPlC);
 
 	qRegisterMetaType<HObject>("HObject");
 	qRegisterMetaType<CoreAlgorithm::PlaneNormal>("CoreAlgorithm::PlaneNormal");
@@ -29,62 +35,67 @@ ProcessThread::~ProcessThread()
 	vp = nullptr;
 	delete alg;
 	alg = nullptr;
+	delete cap;
+	cap = nullptr;
+	delete serial;
+	serial = nullptr;
 }
 
 void ProcessThread::run()
 {
 	mutex.lock();
-	while (threadStatus){
-		switch (stepNum)
-		{
-		case 101:
-			stepOneFirst();
-			break;
-		default:
-			break;
-		}
-		
-	}
+	step();
 	mutex.unlock();
 }
 
-void ProcessThread::stepOneFirst()
+void ProcessThread::step()
 {
 	//Í³¼Æ³ÌÐòÔËÐÐÊ±¼ä
 	clock_t start, finish;
 	double totaltime;
 	start = clock();
-	Sleep(100);
-	LeftScannerRun(101, leftCircle_cloudPoints, leftCenterResult);
-	Sleep(500);
+	//»ñÈ¡¹¤Î»²É¼¯ÐòºÅ
+	//stepCapture *scNum;
+	//scNum = getStepCapture(stepNum);
+	if (stepNum % 2 == 1&&stepNum!=103){
 #ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
+		motion->CheckRun();
+		Sleep(100);
 #endif
-	sendStatusUpdate(QStringLiteral("×ó²àÍ·É¨ÃèÍê±Ï"), 0);
-	Sleep(100);
+		LeftScannerRun(stepNum, leftCircle_cloudPoints, leftCenterResult);
+		Sleep(500);
 #ifndef SETUP
-	//×ªÌ¨Ðý×ª180¶È.
-	motion->platformLtoRRotate();
+		motion->CheckRun();
+		Sleep(100);
 #endif
-	Sleep(500);
-	RightScannerRun(102, transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst);
-	sendStatusUpdate(QStringLiteral("ÓÒ²àÍ·É¨ÃèÍê±Ï"), 0);
+		sendStatusUpdate(QStringLiteral("×ó²àÍ·É¨ÃèÍê±Ï"), 0);
+		Sleep(100);
+	}
+
+	if (stepNum % 2 == 0 || stepNum == 103){
 #ifndef SETUP
-	motion->CheckRun();
-	Sleep(100);
-	motion->platformRtoLRotate();
+		motion->CheckRun();
+		Sleep(100);
+#endif
+#ifndef SETUP
+		//×ªÌ¨Ðý×ª180¶È.
+		motion->platformLtoRRotate();
+#endif
+		Sleep(500);
+		RightScannerRun(stepNum, transmissionCaseCircleFirst_cloudPoints, transmissionCaseCenterResultFirst);
+		sendStatusUpdate(QStringLiteral("ÓÒ²àÍ·É¨ÃèÍê±Ï"), 0);
+#ifndef SETUP
+		motion->CheckRun();
+		Sleep(100);
+		motion->platformRtoLRotate();
 #endif // !SETUP
-	cout << "Ô²ÐÄ: " << endl;
-	/*cout << leftCenterResult.center.x << " " << leftCenterResult.center.y << " " << leftCenterResult.center.z << endl;*/
-	cout << transmissionCaseCenterResultFirst.center.x
-		<< " " << transmissionCaseCenterResultFirst.center.y
-		<< " " << transmissionCaseCenterResultFirst.center.z << endl;
-	//ÏÔÊ¾±ßÔµµãÔÆ¼°Ô²ÐÄ
+}
+
+
 #ifndef PROGRESS
 
 #endif//£¡PROGRESS
-	sendStatusUpdate(QStringLiteral("¹¤Î»1µÚÒ»²¿·ÖÔËÐÐÍê±Ï"), 0);
+	//sendStatusUpdate(QStringLiteral("±¾¹¤Î»ÔËÐÐÍê±Ï"), 0);
 	finish = clock();
 	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
 	cout << "´Ë³ÌÐòµÄÔËÐÐÊ±¼äÎª" << totaltime << "Ãë£¡" << endl;
@@ -94,8 +105,9 @@ void ProcessThread::stepOneFirst()
 
 }
 
-void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult)
+void ProcessThread::LeftScannerRun(stepName stepNum, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult)
 {
+	cout << "stepNum = " << stepNum << endl;
 	//Í³¼Æ³ÌÐòÔËÐÐÊ±¼ä
 	clock_t start, finish;
 	double totaltime;
@@ -103,24 +115,26 @@ void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr 
 	double endPosition;
 	double position;
 	//***ÉùÃ÷±äÁ¿**************************************************************//
-
+	//Êý¾ÝÇå¿Õ£¬ÎªÏÂ´Î´¢´æ×ö×¼±¸
+	leftRunDis.clear();
 	//»ñÈ¡¹¤²½Ïà¹Ø²ÎÊý
-	emit sendStepNum(num);
+	emit sendStepNum(stepNum);
 	//»ñÈ¡µ¼¹ìµ±Ç°Î»ÖÃ
 #ifndef SETUP
 	startPosition = motion->GetCurrentPositon();
 #endif //SETUP
 
 	//ÉùÃ÷Éî¶ÈÍ¼
-	HObject inputImageFirst, inputImageSecond;
+	//HObject inputImageFirst;
 	//ÉùÃ÷±äÁ¿
 	double speed;
 	Vector<Point3f> points;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
 	start = clock();
+
 #ifndef SETUP
 	//¹âÉ¾³ß¼ÆÊýÇåÁã
-	serial->clearGratingData();
+	//serial->clearGratingData();
 	Sleep(100);
 	//ÉèÖÃµ¼¹ìÔË¶¯ËÙ¶È
 	motion->setLeadRailVelocity(CameraNoScanSpeed);
@@ -139,61 +153,74 @@ void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr 
 	motion->setLeadRailVelocity(speed);
 	//»ñÈ¡Í¼Ïñ
 	GrabImageStart(cap->hv_AcqHandle, -1);
+	cout << "1111111111" << endl;
 	//´¥·¢Ïà»ú
 	cap->sendPLC();
+	cout << "1111111111" << endl;
 	//Æô¶¯µ¼¹ì¿ªÊ¼ÔË¶¯, ÒÆ¶¯¾àÀëÎª50mm
 	motion->setLeadRailMotionDistance(CameraScanDistance);
+	cout << "1111111111" << endl;
 	GrabImageAsync(&inputImageFirst, cap->hv_AcqHandle, -1);
+	cout << "1111111111" << endl;
 #endif //SETUP
 
 #ifndef READIMAGE
 	QString ImageFileName;
-	switch (num)
+	switch (stepNum)
 	{
-	case 101:
-		ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
-		break;
-	case 201:
-		ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";;
-		break;
-	case 203:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 301:
-		ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";;
-		break;
-	case 303:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 401:
-		ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
-		break;
-	case 501:
-		ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
-		break;
-	case 1010:
-		ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
-		break;
-	case 2010:
-		ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";;
-		break;
-	case 2030:
-		ImageFileName = "edge/hole1.tif";
-		break;
-	case 3010:
-		ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
-		break;
-		break;
-	default:
-		break;
+		//case left_hOneFP:
+		//	ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_hTwoFP:
+		//	ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_hTwoSP:
+		//	ImageFileName = "edge/hole1.tif";
+		//	break;
+		//case left_hThreeFP:
+		//	ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_hThreeSP:
+		//	ImageFileName = "edge/hole1.tif";
+		//	break;
+		//case left_hFourFP:
+		//	ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_hFourSP:
+		//	ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_hFiveFP:
+		//	ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_hFiveSP:
+		//	ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_vOneFP:
+		//	ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_vTwoFP:
+		//	ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_vTwoSP:
+		//	ImageFileName = "edge/hole1.tif";
+		//	break;
+		//case left_vThreeFP:
+		//	ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//case left_vThreeSP:
+		//	ImageFileName = "gear/LeftFirst" + QString::number(imageNum) + ".tif";
+		//	break;
+		//default:
+		//	break;
 	}
 
-	cout << ImageFileName.toStdString() << endl << endl;
+	/*cout << ImageFileName.toStdString() << endl << endl;
 	QByteArray ba = ImageFileName.toLatin1();
 	const char *str = ba.data();
 	cout << ImageFileName.toStdString() << endl << endl;
 	HTuple  ImageName(str);
-	ReadImage(&inputImageFirst, ImageName);
+	*/
+	//Mat img = imread("edge/LeftSecond1.tif");
 #endif // !READIMAGE
 	//ÏÔÊ¾²¢ÇÒ±£´æÍ¼Æ¬
 	emit sendImageAndSave(inputImageFirst, 101, "LeftFirst");
@@ -201,9 +228,13 @@ void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr 
 	//displayImage(inputImageFirst, 101);
 	////±£´æÍ¼Æ¬
 	//SaveImage(inputImageFirst, "LeftFirst");
+	//cout << "success" << endl;
+	//ba = ImageFileName.toLatin1();
+	//const char *str1 = ba.data();
+	//HTuple  ImageName1(str1);
 
 #ifndef SETUP
-	if (num == 203 || num == 303 || num == 2030){
+	if (scNum == 203 || scNum == 303 || scNum == 2030){
 		HObject  ho_EmptyRegion;
 		GenEmptyRegion(&ho_EmptyRegion);
 		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
@@ -233,57 +264,22 @@ void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr 
 	}
 
 
-#endif //SETUP
-
-#ifndef READIMAGE
-	switch (num)
-	{
-	case 101:
-		ImageFileName = "edge/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 201:
-		ImageFileName = "edge/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 301:
-		ImageFileName = "edge/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 401:
-		ImageFileName = "gear/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 501:
-		ImageFileName = "gear/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 1010:
-		ImageFileName = "edge/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 2010:
-		ImageFileName = "edge/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	case 3010:
-		ImageFileName = "gear/LeftSecond" + QString::number(imageNum) + ".tif";
-		break;
-	default:
-		break;
-	}
-	if (num != 203 && num != 303 && num != 2030){
-		ba = ImageFileName.toLatin1();
-		const char *str1 = ba.data();
-		HTuple  ImageName1(str1);
-		ReadImage(&inputImageSecond, ImageName1);
-	}
-	else{
-		HObject  ho_EmptyRegion;
-		GenEmptyRegion(&ho_EmptyRegion);
-		RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
-	}
-
-#endif //READIMAGE
+#endif //SETUP						
+	//inputImageSecond = inputImageFirst;
+	//}
+	//else{
+	//	HObject  ho_EmptyRegion;
+	//	GenEmptyRegion(&ho_EmptyRegion);
+	//	RegionToBin(ho_EmptyRegion, &inputImageSecond, 255, 0, 4096, 2000);
+	//}
+	//HalconCpp::WriteImage(inputImageFirst, "tiff", 0, "1.tif");
+	//HalconCpp::WriteImage(inputImageSecond, "tiff", 0, "2.tif");
 	emit sendImageAndSave(inputImageSecond, 102, "LeftSecond");
 	////ÏÔÊ¾Í¼Æ¬
 	//displayImage(inputImageSecond, 102);
 	////±£´æÍ¼Æ¬
 	//SaveImage(inputImageSecond, "LeftSecond");
-
+	cout << "success" << endl;
 #ifndef SETUP
 	motion->CheckRun();
 	Sleep(100);
@@ -298,49 +294,103 @@ void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr 
 	cout << "²âÊÔ" << endl;
 	//·¢ËÍÊý¾Ý
 	emit sendLeftGratingData(leftRunDis);
-	//Êý¾ÝÇå¿Õ£¬ÎªÏÂ´Î´¢´æ×ö×¼±¸
-	leftRunDis.clear();
+	cout << "²âÊÔ9" << endl;
 #endif //SETUP
 
 #ifndef PROGRESS
-	switch (num)
+
+	////emit sendProcessingInformation(num, inputImageFirst, inputImageSecond);
+	//switch (scNum)
+	//{
+	//case left_hOneFP:
+	//	break;
+	//case right_hOneFP:
+	//	break;
+	//case left_hOneSP:
+	//	break;
+	//case right_hOneSP:
+	//	break;
+	//case left_hTwoFP:
+	//	break;
+	//case right_hTwoFP:
+	//	break;
+	//case left_hTwoSP:
+	//	break;
+	//case right_hTwoSP:
+	//	break;
+	//case left_hThreeFP:
+	//	break;
+	//case right_hThreeFP:
+	//	break;
+	//case left_hThreeSP:
+	//	break;
+	//case right_hThreeSP:
+	//	break;
+	//case left_hFourFP:
+	//	break;
+	//case right_hFourFP:
+	//	break;
+	//case left_hFourSP:
+	//	break;
+	//case right_hFourSP:
+	//	break;
+	//case left_hFiveFP:
+	//	break;
+	//case right_hFiveFP:
+	//	break;
+	//case left_hFiveSP:
+	//	break;
+	//case right_hFiveSP:
+	//	break;
+	//case left_vOneFP:
+	//	break;
+	//case right_vOneFP:
+	//	break;
+	//case left_vOneSP:
+	//	break;
+	//case right_vOneSP:
+	//	break;
+	//case left_vTwoFP:
+	//	break;
+	//case right_vTwoFP:
+	//	break;
+	//case left_vTwoSP:
+	//	break;
+	//case right_vTwoSP:
+	//	break;
+	//case left_vThreeFP:
+	//	break;
+	//case right_vThreeFP:
+	//	break;
+	//case left_vThreeSP:
+	//	break;
+	//case right_vThreeSP:
+	//	break;
+	//default:
+	//	break;
+	//}
+	switch (stepNum)
 	{
 	case 101:
-		//emit sendProcessingInformation(101, inputImageFirst, inputImageSecond);
-		stepOneFirstLeftProcessing(101,  inputImageFirst,  inputImageSecond);
+		stepOneFirstLeftProcessing(101, inputImageFirst, inputImageSecond);
 		break;
 	case 201:
-		emit sendProcessingInformation(201, inputImageFirst, inputImageSecond);
+		stepTwoLeftProcessing(201, inputImageFirst, inputImageSecond);
 		break;
 	case 203:
-		emit sendProcessingInformation(203, inputImageFirst, inputImageSecond);
+		stepTwoLeftFlangeHoleProcessing(203, inputImageFirst);
 		break;
 	case 301:
-		emit sendProcessingInformation(301, inputImageFirst, inputImageSecond);
+		stepThreeLeftProcessing(301, inputImageFirst, inputImageSecond);
 		break;
 	case 303:
-		emit sendProcessingInformation(303, inputImageFirst, inputImageSecond);
+		stepThreeLeftFlangeHoleProcessing(303, inputImageFirst);
 		break;
 	case 401:
-		emit sendProcessingInformation(401, inputImageFirst, inputImageSecond);
+		stepFourLeftProcessing(401, inputImageFirst, inputImageSecond);
 		break;
 	case 501:
-		emit sendProcessingInformation(501, inputImageFirst, inputImageSecond);
-		break;
-	case 1010:
-		emit sendProcessingInformation(1010, inputImageFirst, inputImageSecond);
-		break;
-	case 2010:
-		emit sendProcessingInformation(2010, inputImageFirst, inputImageSecond);
-		break;
-	case 2030:
-		emit sendProcessingInformation(2030, inputImageFirst, inputImageSecond);
-		break;
-	case 3010:
-		emit sendProcessingInformation(3010, inputImageFirst, inputImageSecond);
-		break;
-	case 3030:
-		emit sendProcessingInformation(3030, inputImageFirst, inputImageSecond);
+		stepFiveLeftProcessing(501, inputImageFirst, inputImageSecond);
 		break;
 	default:
 		break;
@@ -355,7 +405,7 @@ void ProcessThread::LeftScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr 
 	cout << "´Ë³ÌÐòµÄÔËÐÐÊ±¼äÎª" << totaltime << "Ãë£¡" << endl;
 }
 
-void ProcessThread::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult)
+void ProcessThread::RightScannerRun(stepName stepNum, pcl::PointCloud<pcl::PointXYZ>::Ptr &borderCloud_ptr, CoreAlgorithm::StereoCircle &centerResult)
 {
 	//Í³¼Æ³ÌÐòÔËÐÐÊ±¼ä
 	clock_t start, finish;
@@ -369,7 +419,7 @@ void ProcessThread::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr
 	startPosition = motion->GetCurrentPositon();
 #endif //SETUP
 	//»ñÈ¡¹¤²½Ïà¹Ø²ÎÊý
-	emit sendStepNum(num);
+	emit sendStepNum(stepNum);
 	//ÉùÃ÷Éî¶ÈÍ¼
 	HObject inputImageFirst, inputImageSecond;
 	//ÉùÃ÷±äÁ¿
@@ -404,7 +454,7 @@ void ProcessThread::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr
 
 #ifndef READIMAGE
 	QString ImageFileName;
-	switch (num)
+	switch (stepNum)
 	{
 	case 102:
 		ImageFileName = "edge/LeftFirst" + QString::number(imageNum) + ".tif";
@@ -496,7 +546,7 @@ void ProcessThread::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr
 #endif //SETUP
 
 #ifndef READIMAGE
-	switch (num)
+	switch (stepNum)
 	{
 	case 102:
 		ImageFileName = "edge/LeftSecond" + QString::number(imageNum) + ".tif";
@@ -534,7 +584,7 @@ void ProcessThread::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr
 	default:
 		break;
 	}
-	if (num != 204 && num != 304 && num != 2040){
+	if (stepNum != 204 && stepNum != 304 && stepNum != 2040){
 		ba = ImageFileName.toLatin1();
 		const char *str1 = ba.data();
 		HTuple  ImageName1(str1);
@@ -573,54 +623,36 @@ void ProcessThread::RightScannerRun(int num, pcl::PointCloud<pcl::PointXYZ>::Ptr
 #endif //SETUP
 
 #ifndef PROGRESS 
-	switch (num)
+	//emit sendProcessingInformation(num, inputImageFirst, inputImageSecond);
+	switch (stepNum)
 	{
 	case 102:
-		stepOneSecondRightProcessing(102,inputImageFirst,inputImageSecond);
+		stepOneSecondRightProcessing(102, inputImageFirst, inputImageSecond);
 		break;
-	case 104:
-		emit sendProcessingInformation(104, inputImageFirst, inputImageSecond);
+	case 103:
+		stepOneSecondRightProcessing(103, inputImageFirst, inputImageSecond);
 		break;
 	case 202:
-		emit sendProcessingInformation(202, inputImageFirst, inputImageSecond);
+		stepTwoRightProcessing(202, inputImageFirst, inputImageSecond);
 		break;
 	case 204:
-		emit sendProcessingInformation(204, inputImageFirst, inputImageSecond);
+		stepTwoRightFlangeHoleProcessing(204, inputImageFirst);
 		break;
 	case 302:
-		emit sendProcessingInformation(302, inputImageFirst, inputImageSecond);
+		stepThreeRightProcessing(302, inputImageFirst, inputImageSecond);
 		break;
 	case 304:
-		emit sendProcessingInformation(304, inputImageFirst, inputImageSecond);
+		stepThreeRightFlangeHoleProcessing(304, inputImageFirst);
 		break;
 	case 402:
-		emit sendProcessingInformation(402, inputImageFirst, inputImageSecond);
+		stepFourRightProcessing(402, inputImageFirst, inputImageSecond);
 		break;
 	case 502:
-		emit sendProcessingInformation(502, inputImageFirst, inputImageSecond);
-		break;
-	case 1020:
-		emit sendProcessingInformation(1020, inputImageFirst, inputImageSecond);
-		break;
-	case 1040:
-		emit sendProcessingInformation(1040, inputImageFirst, inputImageSecond);
-		break;
-	case 2020:
-		emit sendProcessingInformation(2020, inputImageFirst, inputImageSecond);
-		break;
-	case 2040:
-		emit sendProcessingInformation(2040, inputImageFirst, inputImageSecond);
-		break;
-	case 3020:
-		emit sendProcessingInformation(3020, inputImageFirst, inputImageSecond);
-		break;
-	case 3040:
-		emit sendProcessingInformation(3040, inputImageFirst, inputImageSecond);
+		stepFiveRightProcessing(502, inputImageFirst, inputImageSecond);
 		break;
 	default:
 		break;
 	}
-
 #endif //PROGRESS
 	cout << "over!" << endl;
 	finish = clock();
@@ -662,9 +694,13 @@ void ProcessThread::receiveProcessingResult(bool planeparamStatus/*Æ½Ãæ·¨Ê¸´¦Àí×
 {
 	emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
 }
-
-void ProcessThread::stepOneFirstLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+//H101 ¼ì²â·¢¶¯»úÖ¹¿Ú·¨Ê¸
+void ProcessThread::stepOneFirstLeftProcessing(int num, HObject &inputImageFirst, HObject &inputImageSecond)
 {
+	cout << "in" << endl;
+	
+	CoreAlgorithm *alg_t = new CoreAlgorithm(0);
+
 	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
 	double LeftIncrementFirst;
 	double LeftIncrementSecond;
@@ -683,7 +719,7 @@ void ProcessThread::stepOneFirstLeftProcessing(int num, HObject inputImageFirst,
 	QTextStream runout(&runfile);
 	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "," << LeftIncrementSecond << "\n";
 	runfile.close();
-
+	cout << LeftIncrementFirst << "," << LeftIncrementSecond << endl;
 	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
 	HObject planeFirstImage, planeSecondImage;
 	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
@@ -700,14 +736,14 @@ void ProcessThread::stepOneFirstLeftProcessing(int num, HObject inputImageFirst,
 	bool status_planeFirst, status_planeSecond;
 	//bool status_circleFirst, status_circleSecond;
 	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
-	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
-	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	planeFirstImage = alg_t->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg_t->getPlaneImage(inputImageSecond, status_planeSecond);
 	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
 	//circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
 	//circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
 	//»ñÈ¡Æ½Ãæµã¼¯
-	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
-	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	planePointsFirst = alg_t->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg_t->depthMapCalibration(planeSecondImage, status_planeSecond);
 	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
 	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
 	//»ñÈ¡±ßÔµµã¼¯
@@ -734,7 +770,7 @@ void ProcessThread::stepOneFirstLeftProcessing(int num, HObject inputImageFirst,
 		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
 		CoreAlgorithm::PlaneNormal planeparam;
 		//»ñÈ¡Æ½Ãæ·¨Ê¸
-		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		planeparam = alg_t->getPlaneNormal(plane_cloudPoints);
 		
 
 		//×ø±ê±ä»»
@@ -780,8 +816,8 @@ void ProcessThread::stepOneFirstLeftProcessing(int num, HObject inputImageFirst,
 		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
 	}
 }
-
-void ProcessThread::stepOneSecondRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+//H102 ¼ì²âÇ°´«¶¯ÏäÖ¹¿ÚÃæÔ²ÐÄ1
+void ProcessThread::stepOneSecondRightProcessing(int num, HObject &inputImageFirst, HObject &inputImageSecond)
 {
 	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
 	double RightIncrementFirst;
@@ -1116,3 +1152,3210 @@ void ProcessThread::stepOneSecondRightProcessing(int num, HObject inputImageFirs
 		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
 	}
 }
+//H201 ¼ì²â·¢¶¯»úÖ¹¿ÚÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ×ø±ê
+void ProcessThread::stepTwoLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double LeftIncrementFirst;
+	double LeftIncrementSecond;
+	/*LeftIncrementFirst = ui.LeftRunFirst_StepTwo->text().toDouble();
+	LeftIncrementSecond = ui.LeftRunFirst_StepTwo->text().toDouble() + ui.LeftCameraScan_StepTwo->text().toDouble()
+		+ ui.LeftRunSecond_StepTwo->text().toDouble();*/
+	vp->calculateMoveDistance(num,LeftIncrementFirst,LeftIncrementSecond);
+
+#ifndef SETUP
+	LeftIncrementFirst = leftRunDis[0];
+	LeftIncrementSecond = leftRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepTwo/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "," << LeftIncrementSecond << "\n";
+	runfile.close();
+
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	if (num == 201){
+		circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
+	}
+	if (num == 2010){
+		circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
+	}
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + LeftIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + LeftIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + LeftIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + LeftIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineUnifyCirclePoints/" + time + " engineUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << num << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineCirclePointsThroughDistanceThreshold/" + time
+				+ " engineCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.05);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineFilterBorderPoints/" + time
+				+ " engineFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineFinalBorderPoints/" + time
+				+ " engineFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H202 ¼ì²âÇ°´«¶¯ÏäÖ¹¿ÚÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ×ø±ê
+void ProcessThread::stepTwoRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double RightIncrementFirst;
+	double RightIncrementSecond;
+	/*RightIncrementFirst = ui.RightRunFirst_StepTwo->text().toDouble();
+	RightIncrementSecond = ui.RightRunFirst_StepTwo->text().toDouble() + ui.RightCameraScan_StepTwo->text().toDouble()
+	+ ui.RightRunSecond_StepTwo->text().toDouble();*/
+	vp->calculateMoveDistance(num, RightIncrementFirst, RightIncrementSecond);
+#ifndef SETUP
+	RightIncrementFirst = rightRunDis[0];
+	RightIncrementSecond = rightRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepTwo/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "right" << "," << RightIncrementFirst << "," << RightIncrementSecond << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	if (num == 202){
+		circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
+	}
+	if (num == 2020){
+		circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
+	}
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + RightIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + RightIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + RightIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + RightIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	if (num == 202){
+		fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxUnifyCirclePoints/" + time + " frontDriveBoxUnifyCirclePoints.txt";
+	}
+	if (num == 2020){
+		fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxUnifyCirclePoints/" + time + " syntheticalDriveBoxUnifyCirclePoints.txt";
+	}
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			if (num == 202){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxCirclePointsThroughDistanceThreshold/" + time
+					+ " frontDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			}
+			if (num == 2020){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxCirclePointsThroughDistanceThreshold/" + time
+					+ " syntheticalDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.05);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			if (num == 202){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxFilterBorderPoints/" + time
+					+ " frontDriveBoxFilterBorderPoints.txt";
+			}
+			if (num == 2020){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxFilterBorderPoints/" + time
+					+ " syntheticalDriveBoxFilterBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+			//×ø±ê±ä»»
+			//ÓÒ²âÍ·×ø±êÏµµ½×ó²àÍ·×ø±êÏµ
+			filterBorderPoints = vp->RightToLeft(filterBorderPoints);
+			centerResult = vp->RightToLeft(centerResult);
+			planeparam = vp->RightToLeft(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//²âÍ·×ø±êÏµµ½»úÆ÷ÈË¹¤¾ß×ø±êÏµ
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//»úÆ÷ÈË¹¤¾ß×ø±êÏµµ½»úÆ÷ÈË»ù×ù×ø±êÏµ
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			if (num == 202){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 2020){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+			if (num == 202){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxFinalBorderPoints/" + time
+					+ " frontDriveBoxFinalBorderPoints.txt";
+			}
+			if (num == 2020){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxFinalBorderPoints/" + time
+					+ " syntheticalDriveBoxFinalBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			time = vp->ReturnTime();
+			if (num == 202){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 2020){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< "null" << "\n";
+			file.close();
+			bool planeparamStatus = true;
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		if (num == 202){
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		}
+		if (num == 2020){
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		}
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H203 ¼ì²â·¢¶¯»úÖ¹¿ÚÒ»¸ö·¨À¼¿×Ô²ÐÄ×ø±ê
+void ProcessThread::stepTwoLeftFlangeHoleProcessing(int num, HObject inputImage)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double LeftIncrementFirst, LeftIncrementSecond;
+	/*LeftIncrementFirst = ui.LeftFangleHoleRun_StepTwo->text().toDouble();*/
+	vp->calculateMoveDistance(num, LeftIncrementFirst, LeftIncrementSecond);
+#ifndef SETUP
+	LeftIncrementFirst = leftRunDis[0];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepTwo/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst;
+	bool status_circleFirst;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImage, status_planeFirst);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	if (num == 203){
+		circleFirstImage = alg->getFlangeHoleEdgeImage(inputImage, status_circleFirst);
+	}
+	if (num == 2030){
+		circleFirstImage = alg->getFlangeHoleEdgeImage(inputImage, status_circleFirst);
+	}
+
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	cout << "Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	cout << "±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + LeftIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + LeftIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleUnifyCirclePoints/" + time + " engineFlangeHoleUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleCirclePointsThroughDistanceThreshold/" + time
+				+ " engineFlangeHoleCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.2);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleFilterBorderPoints/" + time
+				+ " engineFlangeHoleFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleFinalBorderPoints/" + time
+				+ " engineFlangeHoleFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/engineFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H204 ¼ì²âÇ°´«¶¯ÏäÖ¹¿ÚÒ»¸ö·¨À¼¿×Ô²ÐÄ×ø±ê
+void ProcessThread::stepTwoRightFlangeHoleProcessing(int num, HObject inputImage)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double RightIncrementFirst, RightIncrementSecond;
+	/*RightIncrementFirst = ui.RightFangleHoleRun_StepTwo->text().toDouble();*/
+	vp->calculateMoveDistance(num, RightIncrementFirst, RightIncrementSecond);
+#ifndef SETUP
+	RightIncrementFirst = rightRunDis[0];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepTwo/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "right" << "," << RightIncrementFirst << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst;
+	bool status_circleFirst;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImage, status_planeFirst);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	if (num == 204){
+		circleFirstImage = alg->getFlangeHoleEdgeImage(inputImage, status_circleFirst);
+	}
+	if (num == 2040){
+		circleFirstImage = alg->getFlangeHoleEdgeImage(inputImage, status_circleFirst);
+	}
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	cout << "Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	cout << "±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + RightIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + RightIncrementFirst, circlePointsFirst[i].z));
+	}
+
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	if (num == 204){
+		fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleUnifyCirclePoints/" + time
+			+ " frontDriveBoxFlangeHoleUnifyCirclePoints.txt";
+	}
+	if (num == 2040){
+		fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleUnifyCirclePoints/" + time
+			+ " syntheticalDriveBoxFlangeHoleUnifyCirclePoints.txt";
+	}
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyPlanePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			if (num == 204){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold/" + time
+					+ " frontDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold.txt";
+			}
+			if (num == 2040){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold/" + time
+					+ " syntheticalDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.2);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			if (num == 204){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleFilterBorderPoints/" + time
+					+ " frontDriveBoxFlangeHoleFilterBorderPoints.txt";
+			}
+			if (num == 2040){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleFilterBorderPoints/" + time
+					+ " syntheticalDriveBoxFlangeHoleFilterBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			//×ø±ê±ä»»
+			//ÓÒ²âÍ·×ø±êÏµµ½×ó²àÍ·×ø±êÏµ
+			filterBorderPoints = vp->RightToLeft(filterBorderPoints);
+			centerResult = vp->RightToLeft(centerResult);
+			planeparam = vp->RightToLeft(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			if (num == 204){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 2040){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+			if (num == 204){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleFinalBorderPoints/" + time
+					+ " frontDriveBoxFlangeHoleFinalBorderPoints.txt";
+			}
+			if (num == 2040){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleFinalBorderPoints/" + time
+					+ " syntheticalDriveBoxFlangeHoleFinalBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			if (num == 204){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 2040){
+				fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		if (num == 204){
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/frontDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		}
+		if (num == 2040){
+			fileName = vp->engineNumFileName + "/outputFile/stepTwo/secondPart/syntheticalDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		}
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H301 ¼ì²â×ÛºÏ´«ËÍÏäÖ¹¿ÚÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ×ø±ê
+void ProcessThread::stepThreeLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double LeftIncrementFirst;
+	double LeftIncrementSecond;
+	//LeftIncrementFirst = ui.LeftRunFirst_StepThree->text().toDouble();
+	//LeftIncrementSecond = ui.LeftRunFirst_StepThree->text().toDouble() + ui.LeftCameraScan_StepThree->text().toDouble()
+	//	+ ui.LeftRunSecond_StepThree->text().toDouble();
+	vp->calculateMoveDistance(num,LeftIncrementFirst,LeftIncrementSecond);
+#ifndef SETUP
+	LeftIncrementFirst = leftRunDis[0];
+	LeftIncrementSecond = leftRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepThree/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "," << LeftIncrementSecond << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
+	circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + LeftIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + LeftIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + LeftIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + LeftIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxUnifyCirclePoints/" + time + " syntheticalDriveBoxUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxCirclePointsThroughDistanceThreshold/" + time
+				+ " syntheticalDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.05);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFilterBorderPoints/" + time
+				+ " syntheticalDriveBoxFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFinalBorderPoints/" + time
+				+ " syntheticalDriveBoxFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFinalBorderPoints/";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFinalBorderPoints/";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H302 ¼ì²âÇ°´«¶¯ÏäÖ¹¿ÚÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ×ø±ê
+void ProcessThread::stepThreeRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double RightIncrementFirst;
+	double RightIncrementSecond;
+	/*RightIncrementFirst = ui.RightRunFirst_StepThree->text().toDouble();
+	RightIncrementSecond = ui.RightRunFirst_StepThree->text().toDouble() + ui.RightCameraScan_StepThree->text().toDouble()
+	+ ui.RightRunSecond_StepThree->text().toDouble();*/
+	vp->calculateMoveDistance(num,RightIncrementFirst,RightIncrementSecond);
+#ifndef SETUP
+	RightIncrementFirst = rightRunDis[0];
+	RightIncrementSecond = rightRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepThree/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "right" << "," << RightIncrementFirst << "," << RightIncrementSecond << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	circleFirstImage = alg->getFlangeEdgeImage(inputImageFirst, status_circleFirst);
+	circleSecondImage = alg->getFlangeEdgeImage(inputImageSecond, status_circleSecond);
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + RightIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + RightIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + RightIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + RightIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxUnifyCirclePoints/" + time + " frontDriveBoxUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyPlanePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxCirclePointsThroughDistanceThreshold/" + time
+				+ " frontDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.05);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxFilterBorderPoints/" + time
+				+ " frontDriveBoxFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+
+			//×ø±ê±ä»»
+			//ÓÒ²âÍ·×ø±êÏµµ½×ó²àÍ·×ø±êÏµ
+			filterBorderPoints = vp->RightToLeft(filterBorderPoints);
+			centerResult = vp->RightToLeft(centerResult);
+			planeparam = vp->RightToLeft(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//²âÍ·×ø±êÏµµ½»úÆ÷ÈË¹¤¾ß×ø±êÏµ
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//»úÆ÷ÈË¹¤¾ß×ø±êÏµµ½»úÆ÷ÈË»ù×ù×ø±êÏµ
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxFinalBorderPoints/" + time
+				+ " frontDriveBoxFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H303 ¼ì²â×ÛºÏ´«ËÍÏäÖ¹¿ÚÒ»¸ö·¨À¼¿×Ô²ÐÄ×ø±ê
+void ProcessThread::stepThreeLeftFlangeHoleProcessing(int num, HObject inputImage)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double LeftIncrementFirst, LeftIncrementSecond;
+	/*LeftIncrementFirst = ui.LeftFangleHoleRun_StepThree->text().toDouble();*/
+	vp->calculateMoveDistance(num, LeftIncrementFirst, LeftIncrementSecond);
+#ifndef SETUP
+	LeftIncrementFirst = leftRunDis[0];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepThree/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst;
+	bool status_circleFirst;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImage, status_planeFirst);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	circleFirstImage = alg->getFlangeHoleEdgeImage(inputImage, status_circleFirst);
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	cout << "Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	cout << "±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + LeftIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + LeftIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleUnifyCirclePoints/" + time
+		+ " syntheticalDriveBoxFlangeHoleUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyCirclePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold/" + time
+				+ " syntheticalDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.2);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleFilterBorderPoints/" + time
+				+ " syntheticalDriveBoxFlangeHoleFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleFinalBorderPoints/" + time
+				+ " syntheticalDriveBoxFlangeHoleFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/syntheticalDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H304 ¼ì²âÇ°´«¶¯ÏäÖ¹¿ÚÒ»¸ö·¨À¼¿×Ô²ÐÄ×ø±ê
+void ProcessThread::stepThreeRightFlangeHoleProcessing(int num, HObject inputImage)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double RightIncrementFirst, RightIncrementSecond;
+	/*RightIncrementFirst = ui.RightFangleHoleRun_StepThree->text().toDouble();;*/
+	vp->calculateMoveDistance(num,RightIncrementFirst,RightIncrementSecond);
+#ifndef SETUP
+	RightIncrementFirst = rightRunDis[0];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepThree/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "right" << "," << RightIncrementFirst << "\n";
+	runfile.close();
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst;
+	bool status_circleFirst;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImage, status_planeFirst);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	circleFirstImage = alg->getFlangeHoleEdgeImage(inputImage, status_circleFirst);
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	cout << "Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	cout << "±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + RightIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + RightIncrementFirst, circlePointsFirst[i].z));
+	}
+
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleUnifyCirclePoints/" + time + " frontDriveBoxFlangeHoleUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.7, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold/" + time
+				+ " frontDriveBoxFlangeHoleCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.2);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleFilterBorderPoints/" + time
+				+ " frontDriveBoxFlangeHoleFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			//×ø±ê±ä»»
+			//ÓÒ²âÍ·×ø±êÏµµ½×ó²àÍ·×ø±êÏµ
+			filterBorderPoints = vp->RightToLeft(filterBorderPoints);
+			centerResult = vp->RightToLeft(centerResult);
+			planeparam = vp->RightToLeft(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleFinalBorderPoints/" + time
+				+ " frontDriveBoxFlangeHoleFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepThree/secondPart/frontDriveBoxFlangeHoleParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H401 ¼ì²â×Û´«¶¯Ïä»¨¼ü¿×µÄÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ 
+void ProcessThread::stepFourLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double LeftIncrementFirst;
+	double LeftIncrementSecond;
+	/*LeftIncrementFirst = ui.LeftRunFirst_StepFour->text().toDouble();
+	LeftIncrementSecond = ui.LeftRunFirst_StepFour->text().toDouble() + ui.LeftCameraScan_StepFour->text().toDouble()
+	+ ui.LeftRunSecond_StepFour->text().toDouble();*/
+	vp->calculateMoveDistance(num, LeftIncrementFirst, LeftIncrementSecond);
+#ifndef SETUP
+	LeftIncrementFirst = leftRunDis[0];
+	LeftIncrementSecond = leftRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName;
+	if (num == 401){
+		runfileName = vp->engineNumFileName + "/outputFile/stepFour/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	}
+	if (num == 3010){
+		runfileName = vp->engineNumFileName + "/outputFile/stepThree/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	}
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "," << LeftIncrementSecond << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	if (num == 401){
+		circleFirstImage = alg->getEngineSplineEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getEngineSplineEdgeImage(inputImageSecond, status_circleSecond);
+	}
+	if (num == 3010){
+		circleFirstImage = alg->getEngineSplineEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getEngineSplineEdgeImage(inputImageSecond, status_circleSecond);
+	}
+
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + LeftIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + LeftIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + LeftIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + LeftIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+	QString time = vp->ReturnTime();
+	QString fileName;
+	if (num == 401){
+		fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxUnifyCirclePoints/" + time + " syntheticalDriveBoxUnifyCirclePoints.txt";
+	}
+	if (num == 3010){
+		fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineUnifyCirclePoints/" + time + " engineUnifyCirclePoints.txt";
+	}
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyPlanePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.2, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			if (num == 401){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxCirclePointsThroughDistanceThreshold/" + time
+					+ " syntheticalDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			}
+			if (num == 3010){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineCirclePointsThroughDistanceThreshold/" + time
+					+ " engineCirclePointsThroughDistanceThreshold.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.05);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			if (num == 401){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxFilterBorderPoints/" + time
+					+ " syntheticalDriveBoxFilterBorderPoints.txt";
+			}
+			if (num == 3010){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineFilterBorderPoints/" + time
+					+ " engineFilterBorderPoints.txt";
+			}
+
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			if (num == 401){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 3010){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			if (num == 401){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxFinalBorderPoints/" + time
+					+ " syntheticalDriveBoxFinalBorderPoints.txt";
+			}
+			if (num == 3010){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineFinalBorderPoints/" + time
+					+ " engineFinalBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			if (num == 401){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 3010){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		if (num == 401){
+			fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		}
+		if (num == 3010){
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		}
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H402 ¼ì²âÇ°´«¶¯Ïä»¨¼üÖáµÄÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ 
+void ProcessThread::stepFourRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double RightIncrementFirst;
+	double RightIncrementSecond;
+	/*RightIncrementFirst = ui.RightRunFirst_StepFour->text().toDouble();
+	RightIncrementSecond = ui.RightRunFirst_StepFour->text().toDouble() + ui.RightCameraScan_StepFour->text().toDouble()
+		+ ui.RightRunSecond_StepFour->text().toDouble();*/
+	vp->calculateMoveDistance(num, RightIncrementFirst, RightIncrementSecond);
+#ifndef SETUP
+	RightIncrementFirst = rightRunDis[0];
+	RightIncrementSecond = rightRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName;
+	if (num == 402){
+		runfileName = vp->engineNumFileName + "/outputFile/stepFour/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	}
+	if (num == 3020){
+		runfileName = vp->engineNumFileName + "/outputFile/stepThree/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	}
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "right" << "," << RightIncrementFirst << "," << RightIncrementSecond << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	if (num == 402){
+		circleFirstImage = alg->getfrontDriveBoxSplineEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getfrontDriveBoxSplineEdgeImage(inputImageSecond, status_circleSecond);
+	}
+	if (num == 3020){
+		circleFirstImage = alg->getfrontDriveBoxSplineEdgeImage(inputImageFirst, status_circleFirst);
+		circleSecondImage = alg->getfrontDriveBoxSplineEdgeImage(inputImageSecond, status_circleSecond);
+	}
+
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + RightIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + RightIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + RightIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + RightIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	if (num == 402){
+		fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxUnifyCirclePoints/" + time
+			+ " frontDriveBoxUnifyCirclePoints.txt";
+	}
+	if (num == 3020){
+		fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxUnifyCirclePoints/" + time
+			+ " syntheticalDriveBoxUnifyCirclePoints.txt";
+	}
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.2, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			if (num == 402){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxCirclePointsThroughDistanceThreshold/" + time
+					+ " frontDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			}
+			if (num == 3020){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxCirclePointsThroughDistanceThreshold/" + time
+					+ " syntheticalDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.2);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			if (num == 402){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxFilterBorderPoints/" + time
+					+ " frontDriveBoxFilterBorderPoints.txt";
+			}
+			if (num == 3020){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFilterBorderPoints/" + time
+					+ " syntheticalDriveBoxFilterBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+
+			//×ø±ê±ä»»
+			//ÓÒ²âÍ·×ø±êÏµµ½×ó²àÍ·×ø±êÏµ
+			filterBorderPoints = vp->RightToLeft(filterBorderPoints);
+			centerResult = vp->RightToLeft(centerResult);
+			planeparam = vp->RightToLeft(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//²âÍ·×ø±êÏµµ½»úÆ÷ÈË¹¤¾ß×ø±êÏµ
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//»úÆ÷ÈË¹¤¾ß×ø±êÏµµ½»úÆ÷ÈË»ù×ù×ø±êÏµ
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			if (num == 402){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			if (num == 3020){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			if (num == 402){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxFinalBorderPoints/" + time
+					+ " frontDriveBoxFinalBorderPoints.txt";
+			}
+			if (num == 3020){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFinalBorderPoints/" + time
+					+ " frontDriveBoxFinalBorderPoints.txt";
+			}
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			if (num == 402){
+				fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxFinalBorderPoints/" + time
+					+ " frontDriveBoxFinalBorderPoints.txt";
+			}
+			if (num == 3020){
+				fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFinalBorderPoints/" + time
+					+ " frontDriveBoxFinalBorderPoints.txt";
+			}
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		if (num == 402){
+			fileName = vp->engineNumFileName + "/outputFile/stepFour/firstPart/frontDriveBoxFinalBorderPoints/" + time
+				+ " frontDriveBoxFinalBorderPoints.txt";
+		}
+		if (num == 3020){
+			fileName = vp->engineNumFileName + "/outputFile/stepThree/firstPart/syntheticalDriveBoxFinalBorderPoints/" + time
+				+ " frontDriveBoxFinalBorderPoints.txt";
+		}
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H501 ¼ì²â·¢¶¯»ú»¨¼ü¿×µÄÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ
+void ProcessThread::stepFiveLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double LeftIncrementFirst;
+	double LeftIncrementSecond;
+	/*LeftIncrementFirst = ui.LeftRunFirst_StepFive->text().toDouble();
+	LeftIncrementSecond = ui.LeftRunFirst_StepFive->text().toDouble() + ui.LeftCameraScan_StepFive->text().toDouble()
+	+ ui.LeftRunSecond_StepFive->text().toDouble();*/
+	vp->calculateMoveDistance(num, LeftIncrementFirst, LeftIncrementSecond);
+#ifndef SETUP
+	LeftIncrementFirst = leftRunDis[0];
+	LeftIncrementSecond = leftRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepFive/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "left" << "," << LeftIncrementFirst << "," << LeftIncrementSecond << "\n";
+	runfile.close();
+
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	circleFirstImage = alg->getEngineSplineEdgeImage(inputImageFirst, status_circleFirst);
+	circleSecondImage = alg->getEngineSplineEdgeImage(inputImageSecond, status_circleSecond);
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + LeftIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + LeftIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + LeftIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + LeftIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineUnifyCirclePoints/" + time + " engineUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyCirclePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.2, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineCirclePointsThroughDistanceThreshold/" + time
+				+ " engineCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.05);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineFilterBorderPoints/" + time
+				+ " engineFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//×ø±ê±ä»»
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineFinalBorderPoints/" + time
+				+ " engineFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/engineParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+//H502 ¼ì²âÇ°´«¶¯Ïä»¨¼üÖáµÄÆ½Ãæ·¨Ê¸ºÍÔ²ÐÄ
+void ProcessThread::stepFiveRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+	//¶¨Òå²âÍ·×ø±êÏµÏÂYÖáÔöÁ¿
+	double RightIncrementFirst;
+	double RightIncrementSecond;
+	//RightIncrementFirst = ui.RightRunFirst_StepFive->text().toDouble();
+	//RightIncrementSecond = ui.RightRunFirst_StepFive->text().toDouble() + ui.RightCameraScan_StepFive->text().toDouble()
+	//	+ ui.RightRunSecond_StepFive->text().toDouble();
+	vp->calculateMoveDistance(num, RightIncrementFirst, RightIncrementSecond);
+#ifndef SETUP
+	RightIncrementFirst = rightRunDis[0];
+	RightIncrementSecond = rightRunDis[1];
+#endif//SETUP
+	QString runtime = vp->ReturnTime();
+	QString runfileName = vp->engineNumFileName + "/outputFile/stepFive/GratingData.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+	QFile runfile(runfileName);
+	runfile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+	QTextStream runout(&runfile);
+	runout << runtime << "," << "right" << "," << RightIncrementFirst << "," << RightIncrementSecond << "\n";
+	runfile.close();
+
+	//ÉùÃ÷Æ½Ãæ´¦ÀíÍ¼Æ¬
+	HObject planeFirstImage, planeSecondImage;
+	//ÉùÃ÷±ßÔµ´¦ÀíÍ¼Æ¬
+	HObject circleFirstImage, circleSecondImage;
+	//ÉùÃ÷Æ½Ãæµã¼¯
+	Vector<Point3f> planePointsFirst, planePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂÆ½Ãæµã¼¯
+	Vector<Point3f> unifyPlanePoints;
+	//ÉùÃ÷±ßÔµµã¼¯
+	Vector<Point3f> circlePointsFirst, circlePointsSecond;
+	//ÉùÃ÷Í³Ò»×ø±êÏµÏÂ±ßÔµµã¼¯
+	Vector<Point3f> unifyCirclePoints;
+	//ÉùÃ÷Í¼Ïñ´¦Àí½á¹û true or false
+	bool status_planeFirst, status_planeSecond;
+	bool status_circleFirst, status_circleSecond;
+	//»ñÈ¡Æ½Ãæ´¦ÀíÍ¼Æ¬
+	planeFirstImage = alg->getPlaneImage(inputImageFirst, status_planeFirst);
+	planeSecondImage = alg->getPlaneImage(inputImageSecond, status_planeSecond);
+	//»ñÈ¡±ßÔµ´¦ÀíÍ¼Æ¬
+	circleFirstImage = alg->getfrontDriveBoxSplineEdgeImage(inputImageFirst, status_circleFirst);
+	circleSecondImage = alg->getfrontDriveBoxSplineEdgeImage(inputImageSecond, status_circleSecond);
+	//»ñÈ¡Æ½Ãæµã¼¯
+	planePointsFirst = alg->depthMapCalibration(planeFirstImage, status_planeFirst);
+	planePointsSecond = alg->depthMapCalibration(planeSecondImage, status_planeSecond);
+	cout << "1Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsFirst.size() << endl;
+	cout << "2Æ½Ãæµã¼¯ÊýÁ¿£º" << planePointsSecond.size() << endl;
+	//»ñÈ¡±ßÔµµã¼¯
+	circlePointsFirst = alg->depthMapCalibration(circleFirstImage, status_circleFirst);
+	circlePointsSecond = alg->depthMapCalibration(circleSecondImage, status_circleSecond);
+	cout << "1±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsFirst.size() << endl;
+	cout << "2±ßÔµµã¼¯ÊýÁ¿£º" << circlePointsSecond.size() << endl;
+	//²É¼¯µã£¬Í³Ò»×ø±êÏµ
+	for (int i = 0; i < planePointsFirst.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsFirst[i].x, planePointsFirst[i].y + RightIncrementFirst, planePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < planePointsSecond.size(); i++){
+		unifyPlanePoints.push_back(Point3f(planePointsSecond[i].x, planePointsSecond[i].y + RightIncrementSecond, planePointsSecond[i].z));
+	}
+
+	for (int i = 0; i < circlePointsFirst.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsFirst[i].x, circlePointsFirst[i].y + RightIncrementFirst, circlePointsFirst[i].z));
+	}
+
+	for (int i = 0; i < circlePointsSecond.size(); i++){
+		unifyCirclePoints.push_back(Point3f(circlePointsSecond[i].x, circlePointsSecond[i].y + RightIncrementSecond, circlePointsSecond[i].z));
+	}
+	cout << "Í³Ò»×ø±êºóÆ½Ãæµã¼¯ÊýÁ¿£º" << unifyPlanePoints.size() << endl;
+	cout << "Í³Ò»×ø±êºó±ßÔµµã¼¯ÊýÁ¿£º" << unifyCirclePoints.size() << endl;
+
+
+	QString time = vp->ReturnTime();
+	QString fileName;
+	fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxUnifyCirclePoints/" + time + " frontDriveBoxUnifyCirclePoints.txt";
+	QFile file(fileName);
+	file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text);
+	QTextStream out(&file);
+	for (int i = 0; i < unifyCirclePoints.size(); i++){
+		out << unifyCirclePoints[i].x << " " << unifyCirclePoints[i].y << " " << unifyCirclePoints[i].z << endl;
+	}
+	file.close();
+	if (unifyPlanePoints.size() != 0)
+	{
+		//ÉùÃ÷Æ½ÃæµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr plane_cloudPoints(new pcl::PointCloud<pcl::PointXYZ>);
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		//Æ½Ãæµã¼¯×ª»¯ÎªPCLµãÔÆ
+		alg->threeDimensionToPCLPoints(unifyPlanePoints, plane_cloudPoints);
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//»ñÈ¡Æ½Ãæ·¨Ê¸
+		planeparam = alg->getPlaneNormal(plane_cloudPoints);
+		if (unifyPlanePoints.size() != 0)
+		{
+			//¼ÆËã±ßÔµµãµ½ÄâºÏ¿Õ¼äÆ½ÃæµÄ¾àÀë£¬²¢ÉèÖÃ¾àÀëãÐÖµ»ñÈ¡·ûºÏãÐÖµµÄµã
+			//ÉùÃ÷º¯ÊýÊä³öµã
+			Vector<Point3f> out_circlePoints;
+			//ÉùÃ÷µãµ½Æ½Ãæ¾àÀë¼¯ºÏ
+			Vector<double> distance;
+			//ÉèÖÃÏÂãÐÖµÎªmm£¬ÉèÖÃÉÏãÐÖµÎªmm
+			alg->setDistanceThresholdAndGetPoints(unifyCirclePoints, planeparam, distance, 0, 0.2, out_circlePoints);
+			cout << "Êä³öµãÔÆÊýÁ¿£º" << out_circlePoints.size() << endl;
+			ofstream outfile;
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxCirclePointsThroughDistanceThreshold/" + time
+				+ " frontDriveBoxCirclePointsThroughDistanceThreshold.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < out_circlePoints.size(); i++){
+				outfile << out_circlePoints[i].x << " " << out_circlePoints[i].y << " " << out_circlePoints[i].z << endl;
+			}
+			outfile.close();
+			//ÉùÃ÷¿Õ¼äÇòÐÄ
+			CoreAlgorithm::StereoCircle centerResult;
+			//½øÐÐ¿Õ¼äÔ²ÄâºÏ
+			//°ë¾¶Ô¼Êø
+			double R;
+			vp->getRestrictRadius(num, R);
+			Vector<Point3f> subpoints;
+			//¼ÆËã±ßÔµµãµ½ÄâºÏÆ½ÃæµÄÍ¶Ó°µã
+			subpoints = alg->ComputedEdgeProjectionPoints(out_circlePoints, planeparam);
+			centerResult = alg->fitSteroCircle(subpoints, planeparam, R);
+			double averageDistance;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(subpoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			Vector<double>distances;
+			alg->CalculateBorderPointsToCenterDistance(subpoints, centerResult, distances);
+			Vector<Point3f>filterBorderPoints;
+			filterBorderPoints = alg->filterBorderPointsOnDistanceThrehold(subpoints, distances, R, 0.2);
+			cout << "¹ýÂËÇ°µãÊý = " << subpoints.size() << endl;
+			cout << "¹ýÂËºóµãÊý = " << filterBorderPoints.size() << endl;
+			centerResult = alg->fitSteroCircle(filterBorderPoints, planeparam, R);
+			cout << "¿Õ¼äÔ²ÐÄ×ø±ê£º" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			averageDistance = alg->CalculateBorderPointsToCenterAverageDistance(filterBorderPoints, centerResult);
+			cout << endl << "±ßÔµµãµ½¿Õ¼äÔ²ÐÄµÄÆ½¾ù¾àÀëÎª£º " << averageDistance << endl << endl;
+
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxFilterBorderPoints/" + time
+				+ " frontDriveBoxFilterBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+
+			//×ø±ê±ä»»
+			//ÓÒ²âÍ·×ø±êÏµµ½×ó²àÍ·×ø±êÏµ
+			filterBorderPoints = vp->RightToLeft(filterBorderPoints);
+			centerResult = vp->RightToLeft(centerResult);
+			planeparam = vp->RightToLeft(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//²âÍ·×ø±êÏµµ½»úÆ÷ÈË¹¤¾ß×ø±êÏµ
+			filterBorderPoints = vp->MeasureToRobotTool(filterBorderPoints);
+			centerResult = vp->MeasureToRobotTool(centerResult);
+			planeparam = vp->MeasureToRobotTool(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//»úÆ÷ÈË¹¤¾ß×ø±êÏµµ½»úÆ÷ÈË»ù×ù×ø±êÏµ
+			filterBorderPoints = vp->RobotToolToBase(filterBorderPoints);
+			centerResult = vp->RobotToolToBase(centerResult);
+			planeparam = vp->RobotToolToBase(planeparam);
+			cout << "×ø±ê±ä»»£º" << endl;
+			cout << "centerResult :" << centerResult.center.x << " " << centerResult.center.y << " " << centerResult.center.z << endl;
+			cout << "planeparam :" << planeparam.A << " " << planeparam.B << " " << planeparam.C << endl;
+			//±£´æ´¦ÀíÐÅÏ¢
+			QString cirlceStatusStr;
+			if (abs(averageDistance - R) < 0.1){
+				centerResult.status = true;
+				cirlceStatusStr = "true";
+			}
+			else{
+				centerResult.status = false;
+				cirlceStatusStr = "false";
+			}
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << centerResult.center.x << "," << centerResult.center.y << "," << centerResult.center.z << "," << cirlceStatusStr << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << ","
+				<< averageDistance << "\n";
+			file.close();
+			//±£´æ×îºóµãÔÆ
+
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxFinalBorderPoints/" + time
+				+ " frontDriveBoxFinalBorderPoints.txt";
+			outfile.open(fileName.toStdString());
+			for (int i = 0; i < filterBorderPoints.size(); i++){
+				outfile << filterBorderPoints[i].x << " " << filterBorderPoints[i].y << " " << filterBorderPoints[i].z << endl;
+			}
+			outfile.close();
+
+			bool planeparamStatus = true;
+			//±ßÔµµã¼¯×ª»¯ÎªPCLµãÔÆ
+			alg->threeDimensionToPCLPoints(filterBorderPoints, borderCloud_ptr);
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+		else
+		{
+			CoreAlgorithm::StereoCircle centerResult;
+			centerResult.status = false;
+			bool planeparamStatus = true;
+			time = vp->ReturnTime();
+			fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+			QFile file(fileName);
+			file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+			QTextStream out(&file);
+			out << time << "," << num << "," << "null" << "," << "null" << "," << "null" << "," << "false" << ","
+				<< planeparam.A << "," << planeparam.B << "," << planeparam.C << "," << "null" << "\n";
+			file.close();
+			emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+		}
+
+	}
+	else
+	{
+		bool planeparamStatus = false;
+		//ÉùÃ÷¿Õ¼äÆ½Ãæ·¨Ê¸Êý¾Ý½á¹¹
+		CoreAlgorithm::PlaneNormal planeparam;
+		//ÉùÃ÷¿Õ¼äÇòÐÄ
+		CoreAlgorithm::StereoCircle centerResult;
+		centerResult.status = false;
+		//ÉùÃ÷±ßÔµµãÔÆ£¨PCL£©
+		pcl::PointCloud<pcl::PointXYZ>::Ptr borderCloud_ptr(new pcl::PointCloud<pcl::PointXYZ>);
+		time = vp->ReturnTime();
+		fileName = vp->engineNumFileName + "/outputFile/stepFive/firstPart/frontDriveBoxParam.csv";//Ð´ÈëÎÄ¼þµÄÄ¿Â¼
+		QFile file(fileName);
+		file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text);
+		QTextStream out(&file);
+		out << time << "," << num << "," << "null" /*Ô²ÐÄX*/ << "," << "null" /*Ô²ÐÄY*/ << "," << "null"/*Ô²ÐÄZ*/ << "," << "false"/*Ô²ÐÄÄâºÏ×´Ì¬*/ << ","
+			<< "null"/*·¨Ê¸A*/ << "," << "null"/*·¨Ê¸B*/ << "," << "null"/*·¨Ê¸C*/ << "," << "null" /*±ßÔµµãµ½Ô²ÐÄµÄÆ½¾ù¾àÀë*/ << "\n";
+		file.close();
+		emit sendProcessingResult(planeparamStatus, planeparam, centerResult, borderCloud_ptr, num);
+	}
+}
+
+void ProcessThread::initialization()
+{
+#ifndef SETUP
+	double startPosition;
+	double endPosition;
+	cap->initializationCamera();
+	motion->initializationMotion();
+	startPosition = motion->GetCurrentPositon();
+	//³õÊ¼Ê±²É¼¯Ò»´Î
+	/**
+	*ÕâÊÇÒòÎª·¢ÏÖ³ÌÐòÆô¶¯ºóµÄÏà»úµÚÒ»´Î
+	*²É¼¯½á¹ûÍùÍù²»Ì«×¼È·
+	*/
+	//motion->leadRailMotion(50);
+	HObject IMG;
+	//»ñÈ¡µ¼¹ìÔË¶¯ËÙ¶È
+	double speed;
+	speed = cap->RateToSpeed(cap->hv_RateValue);
+	//Æô¶¯µ¼¹ì¿ªÊ¼ÔË¶¯
+	//sendPLC();
+	motion->setLeadRailVelocity(speed);
+	motion->setLeadRailMotionDistance(50);
+	IMG = cap->captureImage();
+	motion->CheckRun();
+	Sleep(100);
+	endPosition = motion->GetCurrentPositon();
+	motion->reset(startPosition, endPosition);
+	motion->CheckRun();
+#endif
+	
+
+}
+
+void ProcessThread::motionActionSlot()
+{
+	motion->show();
+}
+
+void ProcessThread::cameraActionSlot()
+{
+	cap->show();
+}
+
+//stepCapture * ProcessThread::getStepCapture(stepName name)
+//{
+//	static stepCapture sc[2];
+//	switch (name)
+//	{
+//	case h_stepOneFirstPart:
+//		sc[0] = left_hOneFirstP;
+//		sc[1] = right_hOneFirstP;
+//		break;
+//	case h_stepOneSecondPart:
+//		sc[0] = left_hOneSecondP;
+//		sc[1] = right_hOneSecondP;
+//		break;
+//	case h_stepOneThirdPart:
+//		sc[0] = left_hOneThirdP;
+//		sc[1] = right_hOneThirdP;
+//		break;
+//
+//	case h_stepTwoFirstPart:
+//		sc[0] = left_hTwoFirstP;
+//		sc[1] = right_hTwoFirstP;
+//		break;
+//	case h_stepTwoSecondPart:
+//		sc[0] = left_hTwoSecondP;
+//		sc[1] = right_hTwoSecondP;
+//		break;
+//	case h_stepTwoThirdPart:
+//		sc[0] = left_hTwoThirdP;
+//		sc[1] = right_hTwoThirdP;
+//		break;
+//	case h_stepTwoForthPart:
+//		sc[0] = left_hTwoForthP;
+//		sc[1] = right_hTwoForthP;
+//		break;
+//
+//	case h_stepThreeFirstPart:
+//		sc[0] = left_hThreeFirstP;
+//		sc[1] = right_hThreeFirstP;
+//		break;
+//	case h_stepThreeSecondPart:
+//		sc[0] = left_hThreeSecondP;
+//		sc[1] = right_hThreeSecondP;
+//		break;
+//	case h_stepThreeThirdPart:
+//		sc[0] = left_hThreeThirdP;
+//		sc[1] = right_hThreeThirdP;
+//		break;
+//	case h_stepThreeForthPart:
+//		sc[0] = left_hThreeForthP;
+//		sc[1] = right_hThreeForthP;
+//		break;
+//
+//	case h_stepFourFirstPart:
+//		sc[0] = left_hFourFirstP;
+//		sc[1] = right_hFourFirstP;
+//		break;
+//	case h_stepFourSecondPart:
+//		sc[0] = left_hFourSecondP;
+//		sc[1] = right_hFourSecondP;
+//		break;
+//	case h_stepFourThirdPart:
+//		sc[0] = left_hFourThirdP;
+//		sc[1] = right_hFourThirdP;
+//		break;
+//	case h_stepFourForthPart:
+//		sc[0] = left_hFourForthP;
+//		sc[1] = right_hFourForthP;
+//		break;
+//
+//	case h_stepFiveFirstPart:
+//		sc[0] = left_hFiveFirstP;
+//		sc[1] = right_hFiveFirstP;
+//		break;
+//	case h_stepFiveSecondPart:
+//		sc[0] = left_hFiveSecondP;
+//		sc[1] = right_hFiveSecondP;
+//		break;
+//	case h_stepFiveThirdPart:
+//		sc[0] = left_hFiveThirdP;
+//		sc[1] = right_hFiveThirdP;
+//		break;
+//	case h_stepFiveForthPart:
+//		sc[0] = left_hFiveForthP;
+//		sc[1] = right_hFiveForthP;
+//		break;
+//
+//		//·Ö¸î
+//	case v_stepOneFirstPart:
+//		sc[0] = left_vOneFP;
+//		sc[1] = right_vOneFP;
+//		break;
+//	case v_stepOneSecondPart:
+//		sc[0] = left_vOneSP;
+//		sc[1] = right_vOneSP;
+//		break;
+//	case v_stepTwoFirstPart:
+//		sc[0] = left_vTwoFP;
+//		sc[1] = right_vTwoFP;
+//		break;
+//	case v_stepTwoSecondPart:
+//		sc[0] = left_vTwoSP;
+//		sc[1] = right_vTwoSP;
+//		break;
+//	case v_stepThreeFirstPart:
+//		sc[0] = left_vThreeFP;
+//		sc[1] = right_vThreeFP;
+//		break;
+//	case v_stepThreeSecondPart:
+//		sc[0] = left_vThreeSP;
+//		sc[1] = right_vThreeSP;
+//		break;
+//	default:
+//		break;
+//	}
+//	return sc;
+//}
+
+void ProcessThread::v_stepThreeFirstLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+
+}
+
+void ProcessThread::v_stepThreeFirstRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+
+}
+
+void ProcessThread::v_stepThreeSecondLeftProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+
+}
+
+void ProcessThread::v_stepThreeSecondRightProcessing(int num, HObject inputImageFirst, HObject inputImageSecond)
+{
+
+} 
+
+HalconCpp::HObject ProcessThread::getPlaneImage(HObject &inputImage, bool& status)
+{
+	// Local iconic variables
+	HObject  ho_Regions, ho_ImageReduced;
+	HObject  ho_ImageScale, ho_Region, ho_ImageX, ho_ImageY;
+	HObject  ho_ImageZ_, ho_ImageZ;
+	HObject  ho_ROI_0, ho_ROI_1;
+	HObject  ho_RegionUnion, ho_ROI_3, ho_ROI_4, ho_ROI_5, ho_ROI_6;
+	HObject  ho_ROI_7, ho_RegionIntersection;
+	// Local control variables
+	HTuple  hv_WindowHandle, hv_xResolution, hv_yResolution;
+	HTuple  hv_ZoomScale, hv_CalibFile, hv_Homography, hv_gFactor;
+	HTuple  hv_NumCoefficients, hv_Tinv1, hv_Tinv2, hv_savefile;
+	HTuple  hv_Width, hv_Height, hv_Rows, hv_Columns, hv_Grayval;
+	HTuple  hv_X, hv_Y_, hv_Z, hv_Qx, hv_Qy, hv_Qw, hv_X_, hv_Z_;
+	HTuple  hv_HomographyInvert, hv_Ox, hv_Oz, hv_Ow, hv_X_NEW;
+	HTuple  hv_Z_NEW, hv_ObjectModel3D, hv_ObjectModel3D_NEW;
+	HTuple  hv_PoseVis, hv_i, hv_xcd, hv_ycd, hv_zcd, hv_num;
+	HTuple  hv_Seconds1, hv_FileHandle, hv_Seconds2, hv_j, hv_Time;
+	HTuple  hv_Area, hv_Row, hv_Area2, hv_Row2, hv_Column2;
+	HTuple  hv_Column, hv_status, hv_Exception;
+	//***********************************************************************************
+	try
+	{
+		//Í¼Ïñ´¦Àí
+		GetImageSize(inputImage, &hv_Width, &hv_Height);
+		Threshold(inputImage, &ho_Regions, 1, 65535);
+		AreaCenter(ho_Regions, &hv_Area, &hv_Row, &hv_Column);
+
+		GenCircle(&ho_ROI_0, hv_Row, hv_Column, 200);
+		GenCircle(&ho_ROI_1, hv_Row / 2, hv_Column, 200);
+		Union2(ho_ROI_0, ho_ROI_1, &ho_RegionUnion);
+		GenCircle(&ho_ROI_3, hv_Row + 400, hv_Column, 200);
+		Union2(ho_RegionUnion, ho_ROI_3, &ho_RegionUnion);
+		GenCircle(&ho_ROI_4, hv_Row, hv_Column / 2, 200);
+		Union2(ho_RegionUnion, ho_ROI_4, &ho_RegionUnion);
+		GenCircle(&ho_ROI_5, hv_Row, hv_Column + ((hv_Width - hv_Column) / 2), 200);
+		Union2(ho_RegionUnion, ho_ROI_5, &ho_RegionUnion);
+		GenCircle(&ho_ROI_6, hv_Row + ((hv_Height - hv_Row) / 2), hv_Column + ((hv_Width - hv_Column) / 4),
+			200);
+		Union2(ho_RegionUnion, ho_ROI_6, &ho_RegionUnion);
+		GenCircle(&ho_ROI_7, hv_Row + ((hv_Height - hv_Row) / 2), hv_Column - ((hv_Width - hv_Column) / 4),
+			200);
+		Union2(ho_RegionUnion, ho_ROI_7, &ho_RegionUnion);
+		Intersection(ho_Regions, ho_RegionUnion, &ho_RegionIntersection);
+
+		AreaCenter(ho_RegionIntersection, &hv_Area2, &hv_Row2, &hv_Column2);
+		if (0 != (hv_Area2 == 0))
+		{
+			status = false;
+		}
+		else{
+			status = true;
+		}
+
+
+
+		ReduceDomain(inputImage, ho_RegionIntersection, &ho_ImageReduced);
+	}
+	// catch (Exception) 
+	catch (HalconCpp::HException &HDevExpDefaultException)
+	{
+		HDevExpDefaultException.ToHTuple(&hv_Exception);
+		status = false;
+	}
+
+	return ho_ImageReduced;
+}
+
+
+
+
+

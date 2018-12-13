@@ -41,7 +41,7 @@ void MotionControl::platformLtoRRotate()
 	double X_ref_pos;
 	GetVarN("X_ref_pos", &X_ref_pos, 0, pComDD); //从'X_ref_pos'变量中读取转台当前位置的count值
 	//SetVarN("X_vel_max", 120000, 0, pComDD);
-	SetVarN("X_trg", X_ref_pos - 2160000, 0, pComDD);
+	SetVarN("X_trg", X_ref_pos + 180*12000, 0, pComDD);
 	int Run = -1;
 	Sleep(100);
 	getStateN(0, "X_run", &Run, pComDD);
@@ -60,7 +60,7 @@ void MotionControl::platformRtoLRotate()
 	double X_ref_pos;
 	GetVarN("X_ref_pos", &X_ref_pos, 0, pComDD); //从'X_ref_pos'变量中读取转台当前位置的count值
 	//SetVarN("X_vel_max", 120000, 0, pComDD);
-	SetVarN("X_trg", X_ref_pos + 2160000, 0, pComDD);
+	SetVarN("X_trg", X_ref_pos - 180 * 12000, 0, pComDD);
 	int Run = -1;
 	Sleep(100);
 	getStateN(0, "X_run", &Run, pComDD);
@@ -272,7 +272,7 @@ void MotionControl::on_resetButton_clicked()
 		Sleep(800);
 		double X_ref_pos;
 		GetVarN("X_ref_pos", &X_ref_pos, 0, pComDD);
-		SetVarN("X_trg", X_ref_pos - 1612800, 0, pComDD);
+		SetVarN("X_trg", X_ref_pos - 223.9017 * 12000, 0, pComDD);
 		cout << "转台复位完成" << endl;
 		Sleep(100);
 	}
@@ -333,12 +333,10 @@ void MotionControl::on_rotateButton_clicked()
 	}
 	else{
 		if (ui.leftBox->isChecked()){
-			GetVarN("X_ref_pos", &X_ref_pos, 0, pComDD);
-			SetVarN("X_trg", X_ref_pos + 2160000, 0, pComDD);
+			platformRtoLRotate();
 		}
 		if (ui.rightBox->isChecked()){
-			GetVarN("X_ref_pos", &X_ref_pos, 0, pComDD);
-			SetVarN("X_trg", X_ref_pos - 2160000, 0, pComDD);
+			platformLtoRRotate();
 		}
 	}
 	

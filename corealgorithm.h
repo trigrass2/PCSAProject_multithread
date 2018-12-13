@@ -108,14 +108,37 @@ public:
 	void displayCloude(pcl::PointCloud<pcl::PointXYZ>::Ptr Cloud_ptr);
 	//测试使用 生成点云
 	Vector<Point3f> createCloud(HObject &inputImage);
-	//右测头坐标转换到左侧头坐标系下
-	Vector<Point3f> RightToLeft(Vector<Point3f> points);
+	
 	//计算边缘点到圆心的距离，并保存信息,返回平均距离
 	double CalculateBorderPointsToCenterAverageDistance(Vector<Point3f> points, StereoCircle centerPoint);
 	//计算边缘点到圆心的距离
 	void CalculateBorderPointsToCenterDistance(Vector<Point3f> points, StereoCircle centerPoint, Vector<double> &distances);
 	//设置边缘点到圆心的距离阈值，删除到圆心过远和过近点
 	Vector<Point3f> filterBorderPointsOnDistanceThrehold(Vector<Point3f> borderPoints, Vector<double> distances, double R,double threholdRange);
+
+	HObject Mat2HObject(const cv::Mat &image);
+
+	//右测头坐标转换到左侧头坐标系下
+	Vector<Point3f> RightToLeft(Vector<Point3f> points);
+	////右测头坐标转换到左侧头坐标系下，应用于空间圆心
+	//CoreAlgorithm::StereoCircle RightToLeft(CoreAlgorithm::StereoCircle centerResult);
+	////右测头坐标转换到左侧头坐标系下，应用于平面法矢
+	//CoreAlgorithm::PlaneNormal RightToLeft(CoreAlgorithm::PlaneNormal planeparam);
+	////测头坐标系到机器人工具坐标系，应用于边缘点云
+	//Vector<Point3f> MeasureToRobotTool(Vector<Point3f> points);
+	////测头坐标系到机器人工具坐标系，应用于空间圆心
+	//CoreAlgorithm::StereoCircle MeasureToRobotTool(CoreAlgorithm::StereoCircle centerResult);
+	////测头坐标系到机器人工具坐标系，应用于平面法矢
+	//CoreAlgorithm::PlaneNormal MeasureToRobotTool(CoreAlgorithm::PlaneNormal planeparam);
+
+	////机器人工具坐标系到机器人基座坐标系，应用于边缘点云
+	//Vector<Point3f> RobotToolToBase(Vector<Point3f> points);
+	////机器人工具坐标系到机器人基座坐标系，应用于空间圆心
+	//CoreAlgorithm::StereoCircle RobotToolToBase(CoreAlgorithm::StereoCircle centerResult);
+	////机器人工具坐标系到机器人基座坐标系，应用于平面法矢
+	//CoreAlgorithm::PlaneNormal RobotToolToBase(CoreAlgorithm::PlaneNormal planeparam);
+public:
+	/*型号： */
 
 private:
 	//halcon内部自定义函数

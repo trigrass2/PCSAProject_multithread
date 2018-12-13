@@ -16,8 +16,8 @@
 #endif
 
 #include <afx.h>
-#include <afxwin.h>         // MFC 核心與標準元件
-#include <afxext.h>         // MFC 擴充功能
+//#include <afxwin.h>         // MFC 核心與標準元件
+//#include <afxext.h>         // MFC 擴充功能
 #ifndef _AFX_NO_OLE_SUPPORT
 #include <afxdtctl.h>           // MFC 支援的 Internet Explorer 4 通用控制項
 #endif

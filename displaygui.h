@@ -7,22 +7,17 @@ VTK_MODULE_INIT(vtkInteractionStyle);
 #include <QtWidgets/QMainWindow>
 #include<QString>
 #include "ui_displaygui.h"
+//处理线程类头文件 
+#include "processthread.h"
 //
 #include "define.h"
 //网口通讯头文件
 #include "networkcommunication.h"
-//运动控制头文件
-#include "motioncontrol.h"
-//相机采集头文件
-#include "cameracapture.h"
 //核心算法头文件
 #include "corealgorithm.h"
-//串口通讯类头文件
-#include "serialcommunication.h"
 //视觉处理类头文件
 #include "visualprocessing.h"
-//处理线程类头文件 
-#include "processthread.h"
+
 #include<iostream>
 #include <QTimer>
 #include <QDateTime>
@@ -78,42 +73,10 @@ public:
 	//显示图片
 	void displayImage(HObject Image,int num);
 
-	//工步1第一部分
-	void stepOneFirst();
-	//工步1第二部分
-	void stepOneSecond();
-	//工步2第一部分
-	void stepTwoFirst();
-	//工步2第二部分
-	void stepTwoSecond();
-	//工步3第一部分
-	void stepThreeFirst();
-	//工步3第二部分
-	void stepThreeSecond();
-	//工步4第一部分
-	void stepFourFirst();
-	//工步4第二部分
-	void stepFourSecond();
-	//工步5第一部分
-	void stepFiveFirst();
-	//工步5第二部分
-	void stepFiveSecond();
-
 	/**
 	*纵置发动机
 	*/
-	//工步1第一部分
-	void VStepOneFirst();
-	//工步1第二部分
-	void VStepOneSecond();
-	//工步2第一部分
-	void VStepTwoFirst();
-	//工步2第二部分
-	void VStepTwoSecond();
-	//工步3第一部分
-	void VStepThreeFirst();
-	//工步3第二部分
-	void VStepThreeSecond();
+	
 	//HObject转化为Mat类型
 	Mat HImageToIplImage(HObject &Hobj);
 	//Mat转化为QImage类型
@@ -223,10 +186,7 @@ signals:
 public slots:
 	//打开网口通讯设置
 	void networkActionSlot();
-	//打开运动控制
-	void motionActionSlot();
-	//打开相机设置
-	void cameraActionSlot();
+	
 	//打开手眼标定程序
 	void eyeHandActionSlot();
 	//打开视觉处理参数设定
@@ -255,13 +215,13 @@ public slots:
 
 	//测试使用，发送图片序号
 	void receiveImageNum();
+
+	//结束线程
+	void endThread();
 private:
 	Ui::DisplayGUIClass ui;
 	NetworkCommunication *socket;
-	MotionControl *motion;
 	CoreAlgorithm *alg;
-	CameraCapture *cap;
-	SerialCommunication *serial;
 	VisualProcessing *vp;
 	ProcessThread *proThread;
 	//PCL显示

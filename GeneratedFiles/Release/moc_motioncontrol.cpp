@@ -1,7 +1,7 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'motioncontrol.h'
 **
-** Created by: The Qt Meta Object Compiler version 67 (Qt 5.6.3)
+** Created by: The Qt Meta Object Compiler version 67 (Qt 5.9.2)
 **
 ** WARNING! All changes made in this file will be lost!
 *****************************************************************************/
@@ -12,12 +12,14 @@
 #if !defined(Q_MOC_OUTPUT_REVISION)
 #error "The header file 'motioncontrol.h' doesn't include <QObject>."
 #elif Q_MOC_OUTPUT_REVISION != 67
-#error "This file was generated using the moc from 5.6.3. It"
+#error "This file was generated using the moc from 5.9.2. It"
 #error "cannot be used with the include files from this version of Qt."
 #error "(The moc has changed too much.)"
 #endif
 
 QT_BEGIN_MOC_NAMESPACE
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
 struct qt_meta_stringdata_MotionControl_t {
     QByteArrayData data[15];
     char stringdata0[282];
@@ -147,7 +149,7 @@ void MotionControl::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _i
 
 const QMetaObject MotionControl::staticMetaObject = {
     { &QWidget::staticMetaObject, qt_meta_stringdata_MotionControl.data,
-      qt_meta_data_MotionControl,  qt_static_metacall, Q_NULLPTR, Q_NULLPTR}
+      qt_meta_data_MotionControl,  qt_static_metacall, nullptr, nullptr}
 };
 
 
@@ -158,9 +160,9 @@ const QMetaObject *MotionControl::metaObject() const
 
 void *MotionControl::qt_metacast(const char *_clname)
 {
-    if (!_clname) return Q_NULLPTR;
+    if (!_clname) return nullptr;
     if (!strcmp(_clname, qt_meta_stringdata_MotionControl.stringdata0))
-        return static_cast<void*>(const_cast< MotionControl*>(this));
+        return static_cast<void*>(this);
     return QWidget::qt_metacast(_clname);
 }
 
@@ -184,14 +186,15 @@ int MotionControl::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
 // SIGNAL 0
 void MotionControl::sendInfo(QString _t1, int _t2)
 {
-    void *_a[] = { Q_NULLPTR, const_cast<void*>(reinterpret_cast<const void*>(&_t1)), const_cast<void*>(reinterpret_cast<const void*>(&_t2)) };
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(&_t1)), const_cast<void*>(reinterpret_cast<const void*>(&_t2)) };
     QMetaObject::activate(this, &staticMetaObject, 0, _a);
 }
 
 // SIGNAL 1
 void MotionControl::toPLCInfo(QByteArray _t1)
 {
-    void *_a[] = { Q_NULLPTR, const_cast<void*>(reinterpret_cast<const void*>(&_t1)) };
+    void *_a[] = { nullptr, const_cast<void*>(reinterpret_cast<const void*>(&_t1)) };
     QMetaObject::activate(this, &staticMetaObject, 1, _a);
 }
+QT_WARNING_POP
 QT_END_MOC_NAMESPACE
